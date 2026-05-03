@@ -586,14 +586,17 @@ export default function Builder() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isCreatingDoc, setIsCreatingDoc] = useState(false);
 
-  const [toastMessage, setToastMessage] = useState("");
+  const [toast, setToast] = useState({ msg: "", type: "success" });
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
     setTimeout(() => {
-      setToastMessage("");
-    }, 3000);
+      setToast({ msg: "", type: "success" });
+    }, 4000);
   };
+
+  // Keep toastMessage alias for any legacy render reference
+  const toastMessage = toast.msg;
 
   const [previewScale, setPreviewScale] = useState(1);
   const [previewPageHeight, setPreviewPageHeight] = useState(A4_MIN_HEIGHT);
@@ -1068,7 +1071,7 @@ export default function Builder() {
 
       const el = pdfRef.current;
       if (!el) {
-        alert("Export view not ready. Try again.");
+        showToast("Export view not ready. Try again.", "error");
         return;
       }
 
@@ -1082,7 +1085,7 @@ export default function Builder() {
       });
 
       if (!canvas?.width || !canvas?.height) {
-        alert("PDF capture failed (empty canvas). Try again.");
+        showToast("PDF capture failed (empty canvas). Try again.", "error");
         return;
       }
 
@@ -1115,7 +1118,7 @@ export default function Builder() {
       pdf.save(fileName);
     } catch (err) {
       console.error(err);
-      alert("PDF generation failed. Check Console (F12).");
+      showToast("PDF generation failed. Check Console (F12).", "error");
     } finally {
       setExportingPdf(false);
     }
@@ -1174,7 +1177,7 @@ export default function Builder() {
 
       const text = cv.summary?.trim();
       if (!text) {
-        alert("Please enter summary text first.");
+        showToast("Please enter summary text first.", "error");
         return;
       }
 
@@ -1191,7 +1194,7 @@ export default function Builder() {
       console.error(err);
       const msg = err?.message || "AI request failed.";
       setAiError(msg);
-      alert(msg);
+      showToast(msg, "error");
     } finally {
       setSummaryAiLoading(false);
     }
@@ -1203,7 +1206,7 @@ export default function Builder() {
 
       const text = cv.experience?.[index]?.description?.trim();
       if (!text) {
-        alert("Please enter description text first.");
+        showToast("Please enter description text first.", "error");
         return;
       }
 
@@ -1227,7 +1230,7 @@ export default function Builder() {
       console.error(err);
       const msg = err?.message || "AI request failed.";
       setAiError(msg);
-      alert(msg);
+      showToast(msg, "error");
     } finally {
       setExpAiLoading((prev) => ({
         ...prev,
@@ -1257,7 +1260,7 @@ export default function Builder() {
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
-          alert("CV not found!");
+          showToast("CV not found!", "error");
           navigate("/dashboard");
           return;
         }
@@ -1265,7 +1268,7 @@ export default function Builder() {
         const data = snap.data();
 
         if (data.ownerId !== user.uid) {
-          alert("You don't have access to this CV.");
+          showToast("You don't have access to this CV.", "error");
           navigate("/dashboard");
           return;
         }
@@ -1383,7 +1386,7 @@ export default function Builder() {
         setIsHydrated(true);
       } catch (e) {
         console.error(e);
-        alert("Load failed. Check console.");
+        showToast("Load failed. Check console.", "error");
       }
     };
 
@@ -1494,7 +1497,7 @@ export default function Builder() {
         err?.message ||
         "Photo processing failed. Please try another clear human photo.";
       setPhotoError(msg);
-      alert(msg);
+      showToast(msg, "error");
     } finally {
       setUploadingPhoto(false);
     }
@@ -1979,26 +1982,126 @@ export default function Builder() {
 
   return (
     <div className="min-h-screen text-white bg-transparent relative z-0">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-6 right-6 z-[9999] flex items-center justify-between min-w-[280px] rounded-xl bg-gray-900/95 px-5 py-4 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur transform transition-all duration-300 translate-y-0 opacity-100">
-          <div className="flex items-center gap-3">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/20 text-green-400">
-              {toastMessage.includes("❌") ? "⚠️" : "✓"}
+      {/* ── Modern Toast Notification ── */}
+      <div
+        style={{
+          position: "fixed",
+          top: "24px",
+          right: "24px",
+          zIndex: 9999,
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          pointerEvents: toast.msg ? "auto" : "none",
+        }}
+      >
+        <div
+          style={{
+            minWidth: "300px",
+            maxWidth: "420px",
+            background: toast.type === "error"
+              ? "linear-gradient(135deg,rgba(30,10,10,0.97),rgba(40,15,15,0.97))"
+              : "linear-gradient(135deg,rgba(10,20,35,0.97),rgba(10,25,45,0.97))",
+            borderRadius: "16px",
+            boxShadow: toast.type === "error"
+              ? "0 20px 60px rgba(239,68,68,0.25),0 4px 20px rgba(0,0,0,0.5)"
+              : "0 20px 60px rgba(34,197,94,0.18),0 4px 20px rgba(0,0,0,0.5)",
+            border: toast.type === "error"
+              ? "1px solid rgba(239,68,68,0.25)"
+              : "1px solid rgba(34,197,94,0.20)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            overflow: "hidden",
+            transform: toast.msg ? "translateX(0) scale(1)" : "translateX(110%) scale(0.92)",
+            opacity: toast.msg ? 1 : 0,
+            transition: "transform 0.38s cubic-bezier(0.34,1.56,0.64,1), opacity 0.28s ease",
+          }}
+        >
+          {/* Content row */}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px 14px" }}>
+            {/* Icon */}
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: toast.type === "error"
+                  ? "rgba(239,68,68,0.18)"
+                  : "rgba(34,197,94,0.18)",
+                border: toast.type === "error"
+                  ? "1.5px solid rgba(239,68,68,0.40)"
+                  : "1.5px solid rgba(34,197,94,0.35)",
+              }}
+            >
+              {toast.type === "error" ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
+            </div>
+            {/* Message */}
+            <span
+              style={{
+                flex: 1,
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                lineHeight: 1.5,
+                color: "rgba(240,240,255,0.95)",
+                letterSpacing: "0.01em",
+              }}
+            >
+              {toast.msg.replace("✅", "").replace("❌", "").trim()}
             </span>
-            <span className="text-sm font-medium tracking-wide">
-              {toastMessage.replace("✅", "").replace("❌", "").trim()}
-            </span>
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setToast({ msg: "", type: "success" })}
+              style={{
+                flexShrink: 0,
+                width: "28px",
+                height: "28px",
+                borderRadius: "8px",
+                border: "none",
+                background: "rgba(255,255,255,0.06)",
+                color: "rgba(200,210,240,0.6)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.15s, color 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background="rgba(255,255,255,0.14)"; e.currentTarget.style.color="rgba(255,255,255,0.9)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background="rgba(255,255,255,0.06)"; e.currentTarget.style.color="rgba(200,210,240,0.6)"; }}
+              aria-label="Dismiss notification"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+              </svg>
+            </button>
           </div>
-          <button 
-            type="button" 
-            onClick={() => setToastMessage("")}
-            className="ml-4 rounded-md p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          </button>
+          {/* Animated progress bar */}
+          <div
+            style={{
+              height: "3px",
+              background: toast.type === "error"
+                ? "linear-gradient(90deg,#ef4444,#f97316)"
+                : "linear-gradient(90deg,#22c55e,#3b82f6)",
+              transformOrigin: "left",
+              animation: toast.msg ? "toastProgress 4s linear forwards" : "none",
+            }}
+          />
         </div>
-      )}
+      </div>
       <header className="border-b border-white/10 glass-panel">
         <div className="mx-auto flex max-w-6xl items-center justify-between p-4">
           <div>
