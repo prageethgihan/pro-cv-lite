@@ -1,0 +1,13 @@
+{
+  "name": "pro-cv-lite-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "firebase-admin": "^12.5.0",
+    "multer": "^1.4.5-lts.1"
+  }
+}

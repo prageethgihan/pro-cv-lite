@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer utilities {
+  body {
+    background-color: #020617;
+    color: #f8fafc;
+  }
+  
+  .app-bg-animated {
+    background: linear-gradient(-45deg, #0f172a, #312e81, #1e1b4b, #020617);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    color: #f8fafc;
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-input {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    transition: all 0.3s ease;
+  }
+
+  .glass-input:focus {
+    outline: none;
+    border-color: #4f46e5;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+  }
+  
+  .glass-button {
+    background: rgba(255, 255, 255, 0.03);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .glass-primary-button {
+    background: #4f46e5;
+    color: white;
+    border: none;
+    transition: background 0.3s, transform 0.1s;
+  }
+  
+  .glass-primary-button:hover {
+    background: #4338ca;
+  }
+  
+  .glass-primary-button:active:not(:disabled) {
+    transform: translateY(2px);
+  }
+  /* Global Floating Abstract Shapes */
+  .shape {
+    position: absolute;
+    filter: blur(80px);
+    z-index: 0;
+    opacity: 0.6;
+    border-radius: 50%;
+    animation: float 10s infinite ease-in-out alternate;
+  }
+
+  .shape-1 {
+    width: 500px;
+    height: 500px;
+    background: #4f46e5;
+    top: -100px;
+    left: -100px;
+    animation-delay: 0s;
+  }
+
+  .shape-2 {
+    width: 400px;
+    height: 400px;
+    background: #c026d3;
+    bottom: -150px;
+    right: -50px;
+    animation-delay: -5s;
+  }
+
+  .shape-3 {
+    width: 350px;
+    height: 350px;
+    background: #0ea5e9;
+    top: 40%;
+    left: 30%;
+    animation-delay: -2s;
+  }
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, -50px) scale(1.1); }
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes email-pill-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+}
