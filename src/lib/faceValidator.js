@@ -65,7 +65,7 @@ async function getFaceDetector() {
         "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
     },
     runningMode: "IMAGE",
-    minDetectionConfidence: 0.4,
+    minDetectionConfidence: 0.3,
   });
 
   return faceDetector;
@@ -302,8 +302,9 @@ export async function validateHumanPhoto(file) {
     const detections = faceResult?.detections || [];
 
     // Fallback: Check if object detector (coco-ssd) found multiple people
+    // Use a lower threshold (0.3) to catch couples where one person scores lower
     const personPredictions = predictions.filter(
-      (p) => p.class === "person" && Number(p.score || 0) > 0.45
+      (p) => p.class === "person" && Number(p.score || 0) > 0.3
     );
 
     if (detections.length > 1 || personPredictions.length > 1) {
