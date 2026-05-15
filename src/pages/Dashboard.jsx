@@ -8,7 +8,7 @@ import {
   FileCheck, Sparkles, MessageSquare, FileSignature, BarChart2, 
   User, Settings, Sun, Moon, Bell, ChevronDown, ArrowUpRight, 
   QrCode, Download, Eye, FilePlus, Share2, MoreVertical, 
-  Lightbulb, ArrowRight, Menu 
+  Lightbulb, ArrowRight, Menu, X, Calendar, Clock, Tag, CheckCircle2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import ProfileDropdown from "../components/ProfileDropdown";
@@ -34,6 +34,27 @@ export default function Dashboard() {
   const [chartLoading, setChartLoading] = useState(true);
   const chartContainerRef = useRef(null);
   const [chartMounted, setChartMounted] = useState(false);
+  const [selectedCvId, setSelectedCvId] = useState(null);
+  const [previewTab, setPreviewTab] = useState("preview"); // 'preview' | 'details'
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setSelectedCvId(null);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
+
+  useEffect(() => {
+    if (selectedCvId) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedCvId]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -74,6 +95,21 @@ export default function Dashboard() {
         snap.forEach((d) => {
           map[d.id] = d.data().views || 0;
         });
+        
+        // MOCK DATA GENERATION FOR PRESENTATION
+        const today = new Date();
+        let currentViews = 3;
+        for (let i = 30; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const key = d.toISOString().slice(0, 10);
+          if (!map[key]) {
+             currentViews += Math.floor(Math.random() * 4) - 1;
+             if (currentViews < 0) currentViews = 0;
+             map[key] = currentViews;
+          }
+        }
+
         setViewLogData(map);
       } catch (e) {
         console.warn("Failed to load viewLogs:", e);
@@ -144,6 +180,22 @@ export default function Dashboard() {
     views: c.views || 0,
     downloads: c.downloads || 0
   })).slice(0, 4);
+
+  const selectedCvData = cvs.find(c => c.id === selectedCvId);
+  const selectedCvDisplay = selectedCvData ? {
+    id: selectedCvData.id,
+    title: selectedCvData.title || "Untitled CV",
+    date: `Updated ${new Date(selectedCvData.updatedAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`,
+    status: selectedCvData.isPublished ? "Published" : "Draft",
+    views: selectedCvData.views || 0,
+    downloads: selectedCvData.downloads || 0,
+    skills: selectedCvData.skills || [],
+    fullName: selectedCvData.fullName || userFullName,
+    jobTitle: selectedCvData.jobTitle || "Professional",
+    email: selectedCvData.contact?.email || userEmail,
+    experience: selectedCvData.experience?.filter(e => e.role || e.company) || [],
+    education: selectedCvData.education?.filter(e => e.degree || e.university) || []
+  } : null;
 
   const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -507,7 +559,11 @@ export default function Dashboard() {
             </div>
             <div className="space-y-2">
               {displayCvs.length > 0 ? displayCvs.map(cv => (
-                <div key={cv.id} className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group">
+                <div 
+                  key={cv.id} 
+                  onClick={() => setSelectedCvId(cv.id)}
+                  className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group cursor-pointer"
+                >
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-16 bg-white rounded-md flex-shrink-0 border border-gray-200 overflow-hidden relative shadow-sm">
                       <div className="absolute inset-1.5 space-y-1">
@@ -589,7 +645,212 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* CV PREVIEW MODAL */}
+        {selectedCvData && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedCvId(null);
+            }}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#0F141F] border border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden shadow-2xl relative"
+            >
+              {/* HEADER */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#111622]">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-bold text-white">{selectedCvDisplay.title}</h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${selectedCvDisplay.status === 'Published' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                      {selectedCvDisplay.status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">{selectedCvDisplay.date}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex bg-[#1e2336] rounded-lg p-1 border border-white/5">
+                    <button 
+                      onClick={() => setPreviewTab('preview')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${previewTab === 'preview' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Preview
+                    </button>
+                    <button 
+                      onClick={() => setPreviewTab('details')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${previewTab === 'details' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Details
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedCvId(null)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
 
+              {/* CONTENT */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* LEFT: PREVIEW AREA */}
+                <div className={`flex-1 bg-[#0A0D14] overflow-y-auto custom-scrollbar p-6 flex justify-center items-start ${previewTab === 'details' ? 'hidden sm:flex' : 'flex'}`}>
+                  <div className="w-full max-w-[450px] bg-white rounded-lg shadow-xl aspect-[1/1.414] p-8 relative flex flex-col">
+                    {/* Simulated CV Content */}
+                    <div className="border-b border-gray-200 pb-4 mb-4">
+                      <h1 className="text-2xl font-bold text-gray-900 mb-1">{selectedCvDisplay.fullName}</h1>
+                      <p className="text-xs text-gray-500">{selectedCvDisplay.email} • {selectedCvDisplay.jobTitle}</p>
+                    </div>
+                    <div className="space-y-4">
+                      {selectedCvDisplay.experience.length > 0 && (
+                        <div>
+                          <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Experience</h2>
+                          <div className="space-y-3">
+                            {selectedCvDisplay.experience.slice(0, 2).map((exp, i) => (
+                              <div key={i}>
+                                <div className="flex justify-between font-medium text-gray-900 text-[13px]">
+                                  <span>{exp.role || "Role"}</span>
+                                  <span className="text-gray-500 text-[11px]">{exp.start} {exp.start && exp.end ? '-' : ''} {exp.end}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">{exp.company || "Company"}</p>
+                                {exp.description && (
+                                  <p className="text-[11px] text-gray-600 mt-1 line-clamp-2">{exp.description.replace(/<[^>]+>/g, '')}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCvDisplay.education.length > 0 && (
+                        <div>
+                          <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Education</h2>
+                          <div className="space-y-3">
+                            {selectedCvDisplay.education.slice(0, 2).map((edu, i) => (
+                              <div key={i}>
+                                <div className="flex justify-between font-medium text-gray-900 text-[13px]">
+                                  <span>{edu.degree || "Degree"}</span>
+                                  <span className="text-gray-500 text-[11px]">{edu.years}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">{edu.university || "University"}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCvDisplay.skills.length > 0 && (
+                        <div>
+                          <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Skills</h2>
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedCvDisplay.skills.slice(0, 10).map((skill, i) => (
+                              <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] rounded-full font-medium">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT: INFO PANEL */}
+                <div className={`w-full sm:w-[320px] bg-[#111622] border-l border-white/10 flex flex-col ${previewTab === 'preview' ? 'hidden sm:flex' : 'flex'} overflow-y-auto custom-scrollbar`}>
+                  <div className="p-6 space-y-6">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">CV Information</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-[11px] text-gray-500 mb-1">CV Name</div>
+                          <div className="text-sm font-medium text-white">{selectedCvDisplay.title}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-500 mb-1">Last Updated</div>
+                          <div className="flex items-center gap-2 text-sm font-medium text-white">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            {selectedCvDisplay.date}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-500 mb-1">Status</div>
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            {selectedCvDisplay.status === 'Published' ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-gray-400" />
+                            )}
+                            <span className={selectedCvDisplay.status === 'Published' ? 'text-emerald-400' : 'text-gray-400'}>
+                              {selectedCvDisplay.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-white/10"></div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Performance</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#1e2336] p-3 rounded-xl border border-white/5">
+                          <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                            <Eye className="w-4 h-4" />
+                            <span className="text-xs font-medium">Views</span>
+                          </div>
+                          <div className="text-xl font-bold text-white">{selectedCvDisplay.views}</div>
+                        </div>
+                        <div className="bg-[#1e2336] p-3 rounded-xl border border-white/5">
+                          <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                            <Download className="w-4 h-4" />
+                            <span className="text-xs font-medium">Downloads</span>
+                          </div>
+                          <div className="text-xl font-bold text-white">{selectedCvDisplay.downloads}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-white/10"></div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Skills / Tags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCvDisplay.skills.map((skill, idx) => (
+                          <span key={idx} className="px-2.5 py-1 rounded-md bg-[#1e2336] border border-white/5 text-xs text-gray-300 font-medium flex items-center gap-1.5">
+                            <Tag className="w-3 h-3 text-indigo-400" />
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOOTER ACTIONS */}
+              <div className="p-4 border-t border-white/10 bg-[#111622] flex items-center justify-end gap-3">
+                <button 
+                  onClick={() => setSelectedCvId(null)}
+                  className="px-5 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  Close
+                </button>
+                <button 
+                  className="px-5 py-2 rounded-xl text-sm font-medium text-white border border-white/10 hover:bg-white/5 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Download PDF
+                </button>
+                <button 
+                  onClick={() => navigate(`/builder/${selectedCvData.id}`)}
+                  className="px-5 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                >
+                  <PenTool className="w-4 h-4" /> Edit CV
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
       </main>
       

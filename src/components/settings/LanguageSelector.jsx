@@ -38,7 +38,7 @@ const LanguageSelector = ({ currentLang, onSelect }) => {
       <div className="mt-4 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-3">
         <Globe className="w-5 h-5 text-indigo-400 flex-shrink-0" />
         <p className="text-[10px] text-indigo-400 leading-tight">
-          Changing language will update the entire interface text. Support for more languages is being added.
+          Sinhala and Tamil languages are currently in development and will be available in a future update.
         </p>
       </div>
     </div>

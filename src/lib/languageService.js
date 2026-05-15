@@ -27,7 +27,5 @@ export const getTranslation = (lang, path) => {
 };
 
 export const SUPPORTED_LANGUAGES = [
-  { code: "en", label: "English", native: "English" },
-  { code: "si", label: "Sinhala", native: "සිංහල" },
-  { code: "ta", label: "Tamil", native: "தமிழ்" }
+  { code: "en", label: "English", native: "English" }
 ];
