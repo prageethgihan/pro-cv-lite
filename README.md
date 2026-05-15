@@ -1,9 +1,6 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=4F46E5&height=150&section=header&text=ProCV%20Lite&fontSize=50&fontColor=ffffff&animation=twinkling&desc=AI-Powered%20Next-Gen%20Resume%20Builder&descAlignY=75&descAlign=50" width="100%"/>
-</div>
-
-<div align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=25&pause=1000&color=4F46E5&center=true&vCenter=true&width=600&lines=Craft+Your+Perfect+CV;Powered+by+Google+Gemini+AI;Local+Machine+Learning+Features;Modern+Glassmorphism+UI;Secure.+Fast.+Professional." alt="Typing SVG" />
+  <h1>ProCV Lite</h1>
+  <p>AI-Powered Next-Gen Resume Builder</p>
 </div>
 
 <p align="center">
@@ -58,26 +55,6 @@ Whether you're targeting corporate roles, creative positions, or academic placem
 
 ---
 
-## 📸 Sneak Peek
-
-<div align="center">
-  <br/>
-  <b>Interactive Dashboard & Analytics</b><br/><br/>
-  <img src="https://github.com/user-attachments/assets/f46eb5f2-b995-4243-9158-96758ab4a9e6" alt="Dashboard" width="800" style="border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);"/>
-  <br/><br/><br/>
-  
-  <b>Intelligent CV Builder & AI Assistant</b><br/><br/>
-  <img src="https://github.com/user-attachments/assets/925f7403-a540-41b4-be2e-63ba572fbfa4" alt="CV Builder" width="800" style="border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);"/>
-  <br/><br/><br/>
-
-  <b>Secure Firebase Authentication</b><br/><br/>
-  <img src="https://github.com/user-attachments/assets/370eaaf1-cf7a-45c2-bbd3-7abfa798e3e6" alt="Login" width="800" style="border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);"/>
-</div>
-
-<br/>
-
----
-
 ## 🏗️ Architecture & Tech Stack
 
 ProCV Lite is built using modern, robust technologies to ensure high performance, security, and scalability.
@@ -115,5 +92,5 @@ npm run dev
 ---
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=4F46E5&height=100&section=footer&text=Built%20with%20%E2%9D%A4%EF%B8%8F%20by%20Prageeth%20Gihan&fontSize=20&fontColor=ffffff" width="100%"/>
+  <p>Built with ❤️ by Prageeth Gihan</p>
 </div>
