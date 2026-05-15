@@ -100,11 +100,24 @@ Follow these steps to set up the project locally.
 
 ## 📸 Screenshots
 
-*(To make this README even better, add your own screenshots below by replacing the placeholder links!)*
-
 <div align="center">
-  <img src="https://raw.githubusercontent.com/prageethgihan/pro-cv-lite/main/public/placeholder-1.png" alt="Dashboard View" width="48%" onerror="this.src='https://via.placeholder.com/800x450/0f172a/4f46e5?text=Add+Dashboard+Screenshot+Here'"/>
-  <img src="https://raw.githubusercontent.com/prageethgihan/pro-cv-lite/main/public/placeholder-2.png" alt="CV Builder View" width="48%" onerror="this.src='https://via.placeholder.com/800x450/0f172a/4f46e5?text=Add+Builder+Screenshot+Here'"/>
+
+### 🔐 Login Page
+
+<img width="1280" height="592" alt="login png" src="https://github.com/user-attachments/assets/370eaaf1-cf7a-45c2-bbd3-7abfa798e3e6" />
+
+<br/><br/>
+
+### 📊 Dashboard
+
+<img width="1279" height="593" alt="dashboard png" src="https://github.com/user-attachments/assets/f46eb5f2-b995-4243-9158-96758ab4a9e6" />
+
+<br/><br/>
+
+### 🧾 CV Builder
+
+<img width="1280" height="592" alt="cv-builder png" src="https://github.com/user-attachments/assets/925f7403-a540-41b4-be2e-63ba572fbfa4" />
+
 </div>
 
 ---
