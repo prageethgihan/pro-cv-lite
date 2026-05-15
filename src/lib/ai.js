@@ -8,168 +8,185 @@ if (!apiKey) {
 
 const genAI = new GoogleGenerativeAI(apiKey);
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-});
+// Global cooldown tracker
+let lastRequestTime = 0;
+const MIN_COOLDOWN = 1500; // 1.5s between any AI calls
+
+/**
+ * Centralized stable AI request handler.
+ * Optimized for gemini-2.5-flash with NO fallbacks and NO recursive retries.
+ */
+export async function safeAiCall(prompt, config = { model: "gemini-2.5-flash" }, signal = null) {
+  const timeout = 60000;
+  const modelName = "gemini-2.5-flash";
+  const MAX_RETRIES = 3;
+  
+  const executeRequest = async (retryCount = 0) => {
+    // 1. Cooldown protection
+    const now = Date.now();
+    const timeSinceLast = now - lastRequestTime;
+    if (timeSinceLast < MIN_COOLDOWN) {
+      await new Promise(res => setTimeout(res, MIN_COOLDOWN - timeSinceLast));
+    }
+    lastRequestTime = Date.now();
+
+    const model = genAI.getGenerativeModel({ 
+      model: modelName,
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.8,
+        topK: 40,
+      }
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const startTime = Date.now();
+
+    try {
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("AI_TIMEOUT")), timeout)
+        ),
+        ...(signal ? [new Promise((_, reject) => {
+          if (signal.aborted) reject(new Error("AI_CANCELLED"));
+          signal.addEventListener('abort', () => reject(new Error("AI_CANCELLED")));
+        })] : [])
+      ]);
+      
+      clearTimeout(timeoutId);
+
+      if (!result || !result.response) {
+        throw new Error("EMPTY_RESPONSE");
+      }
+
+      return result.response.text();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const msg = err?.message?.toLowerCase() || "";
+      
+      // Handle 503 Service Unavailable (Overload)
+      if ((msg.includes("503") || msg.includes("service_unavailable") || msg.includes("overloaded")) && retryCount < MAX_RETRIES) {
+        const waitTime = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
+        console.warn(`[AI] Server overloaded (503). Retrying in ${waitTime}ms... (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        
+        // Notify via a custom error that can be caught for UI updates if needed, 
+        // but here we just wait and retry internally.
+        await new Promise(res => setTimeout(res, waitTime));
+        return executeRequest(retryCount + 1);
+      }
+      
+      throw err;
+    }
+  };
+
+  return executeRequest();
+}
+
+/**
+ * Maps raw API errors to clean user-friendly messages.
+ */
+export function getFriendlyAiError(error) {
+  const msg = error?.message?.toLowerCase() || "";
+  
+  if (msg.includes("503") || msg.includes("overloaded") || msg.includes("service_unavailable")) {
+    return "AI servers are currently experiencing high demand. Please wait a moment and try again.";
+  }
+  if (msg.includes("429") || msg.includes("quota") || msg.includes("limit")) {
+    return "Daily AI limit reached. Please try again later.";
+  }
+  if (msg.includes("timeout") || msg.includes("ai_timeout")) {
+    return "AI analysis is taking longer than expected. Please wait a moment and try again.";
+  }
+  if (msg.includes("fetch") || msg.includes("network")) {
+    return "Network error. Please check your connection and try again.";
+  }
+  
+  return "Analysis failed temporarily. Please try again.";
+}
 
 function cleanAiText(text) {
   if (!text) return "";
   return text.trim().replace(/^["'`]+|["'`]+$/g, "");
 }
 
+/* ── AI Features ── */
+
 export async function fixGrammar(text) {
   if (!text || !text.trim()) return "";
-
-  const prompt = `
-You are a professional CV writing assistant.
-
-Task:
-Fix grammar, spelling, punctuation, and sentence clarity in the text below.
-
-Rules:
-- Keep the original meaning exactly the same.
-- Do NOT add fake information.
-- Do NOT remove important information.
-- Do NOT convert the text into bullet points unless the input already uses bullet points.
-- Keep the wording natural and professional.
-- Return only the corrected text.
-- Keep it suitable for a CV or resume.
-
-Text:
-${text}
-  `;
-
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  return cleanAiText(response.text());
+  try {
+    const prompt = `Fix grammar and spelling, return ONLY the corrected text: ${text}`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
+  }
 }
 
 export async function improveCvText(text) {
   if (!text || !text.trim()) return "";
-
-  const prompt = `
-You are an expert CV and resume writing assistant.
-
-Task:
-Rewrite the text below so it sounds more professional, polished, concise, and suitable for a modern ATS-friendly CV.
-
-Rules:
-- Keep the original meaning.
-- Do NOT invent fake achievements, fake numbers, fake tools, or fake responsibilities.
-- Do NOT exaggerate beyond what is written.
-- Make the wording stronger and more professional.
-- Use clear, confident, action-oriented language.
-- Keep the result concise and impactful.
-- Keep it suitable for a student's or job seeker's CV.
-- Return only the improved text.
-- Do not use quotation marks around the answer.
-- Do not add headings or bullet points unless the original text already uses them.
-
-Text:
-${text}
-  `;
-
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  return cleanAiText(response.text());
-}
-
-export function buildSummaryPrompt(cv, templateId) {
-  // Clean empty fields
-  const cleanData = {};
-  if (cv.fullName?.trim()) cleanData.fullName = cv.fullName.trim();
-  if (cv.jobTitle?.trim()) cleanData.jobTitle = cv.jobTitle.trim();
-
-  const skills = cv.skills?.filter((s) => s.trim() !== "") || [];
-  if (skills.length > 0) cleanData.skills = skills;
-
-  const experience = cv.experience
-    ?.filter((e) => e.role?.trim() || e.company?.trim())
-    ?.map((e) => ({
-      role: e.role,
-      company: e.company,
-      years: `${e.start} - ${e.end}`,
-    }));
-  if (experience?.length > 0) cleanData.experience = experience;
-
-  const education = cv.education
-    ?.filter((e) => e.degree?.trim() || e.university?.trim())
-    ?.map((e) => ({
-      degree: e.degree,
-      university: e.university,
-    }));
-  if (education?.length > 0) cleanData.education = education;
-
-  const languages = cv.languages?.filter((l) => l.trim() !== "") || [];
-  if (languages.length > 0) cleanData.languages = languages;
-
-  /* -- Template 6 only: include O/L, A/L, and extra qualifications -- */
-  if (templateId === "t6") {
-    const alSubs = cv.alResults?.subjects?.filter((s) => s.subject?.trim()) || [];
-    if (alSubs.length || cv.alResults?.stream || cv.alResults?.year) {
-      cleanData.alResults = {
-        stream:   cv.alResults?.stream || undefined,
-        year:     cv.alResults?.year   || undefined,
-        school:   cv.alResults?.school || undefined,
-        subjects: alSubs.map((s) => ({ subject: s.subject, grade: s.grade })),
-      };
-    }
-
-    const olSubs = cv.olResults?.subjects?.filter((s) => s.subject?.trim()) || [];
-    if (olSubs.length || cv.olResults?.year) {
-      cleanData.olResults = {
-        year:     cv.olResults?.year   || undefined,
-        school:   cv.olResults?.school || undefined,
-        subjects: olSubs.map((s) => ({ subject: s.subject, grade: s.grade })),
-      };
-    }
-
-    const extraQ = (cv.extraQualifications ?? []).filter(
-      (q) => q.title?.trim() || q.provider?.trim()
-    );
-    if (extraQ.length > 0) {
-      cleanData.extraQualifications = extraQ.map((q) => ({
-        title:    q.title    || undefined,
-        provider: q.provider || undefined,
-        year:     q.year     || undefined,
-      }));
-    }
-
-    const coreComp = (cv.coreCompetencies ?? []).filter((c) => c.trim());
-    if (coreComp.length > 0) {
-      cleanData.coreCompetencies = coreComp;
-    }
+  try {
+    const prompt = `Improve this text for a professional CV, return ONLY the improved text: ${text}`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
   }
-
-  const hasAcademic = templateId === "t6" && (cleanData.alResults || cleanData.olResults || cleanData.extraQualifications);
-  const hasCoreComp = templateId === "t6" && (cleanData.coreCompetencies?.length > 0);
-
-  return `
-You are an expert CV and resume writing assistant.
-
-Task:
-Analyze the following CV details and generate a concise professional profile summary.
-
-Rules:
-- Professional tone.
-- Concise (2 to 4 sentences).
-- CV-friendly.
-- No bullet points.
-- No headings.
-- No fake information or assumptions (do not invent achievements, years of experience, unknown certifications, or companies not provided).
-- Write ONLY from the provided data.
-${hasAcademic ? "- If O/L results, A/L results, or extra qualifications are provided, briefly and naturally mention the candidate's strong academic background and qualifications. Do not invent ranks, awards, or achievements not listed." : ""}
-${hasCoreComp ? "- If core competencies are listed, you may naturally weave one or two of the most relevant soft strengths into the summary (e.g. Teamwork, Leadership). Do not list them as bullet points." : ""}
-- Return ONLY the generated plain text. Do not use Markdown, quotation marks, or HTML formatting.
-
-User CV Data:
-${JSON.stringify(cleanData, null, 2)}
-  `.trim();
 }
 
 export async function generateAiSummary(cv, templateId) {
-  const prompt = buildSummaryPrompt(cv, templateId);
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  return cleanAiText(response.text());
-}
+  try {
+    const prompt = `Generate a 2-3 sentence professional CV summary based on this data: ${JSON.stringify(cv)}`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
+  }
+}
+
+export async function generateAiWriterContent(type, data) {
+  try {
+    const prompt = `Generate ${type} for a CV using these details: ${JSON.stringify(data)}. Return ONLY the result.`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
+  }
+}
+
+export async function generateCoverLetter(data) {
+  try {
+    const prompt = `Generate a professional cover letter based on the following details:
+    Name: ${data.name}
+    Target Role: ${data.jobTitle}
+    Company: ${data.company}
+    Skills: ${data.skills}
+    Tone: ${data.tone}
+    Experience: ${data.experience}
+    Additional Info: ${data.notes}
+    
+    Return ONLY the cover letter content. Be professional and persuasive.`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
+  }
+}
+
+export async function improveCoverLetter(content, data) {
+  try {
+    const prompt = `Improve the following cover letter for ${data.jobTitle} at ${data.company}. 
+    Make it more professional, persuasive, and ensure it highlights these skills: ${data.skills}.
+    
+    Current Content:
+    ${content}
+    
+    Return ONLY the improved cover letter content.`;
+    const response = await safeAiCall(prompt);
+    return cleanAiText(response);
+  } catch (err) {
+    throw new Error(getFriendlyAiError(err));
+  }
+}
+

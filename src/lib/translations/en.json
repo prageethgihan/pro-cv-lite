@@ -1,0 +1,34 @@
+{
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your account and app preferences",
+    "sections": {
+      "password": {
+        "title": "Change Password",
+        "subtitle": "Update your account security"
+      },
+      "notifications": {
+        "title": "Notification Preferences",
+        "subtitle": "Control your alerts and emails"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "subtitle": "Customize your display and theme"
+      },
+      "language": {
+        "title": "Language",
+        "subtitle": "Select your preferred display language"
+      },
+      "privacy": {
+        "title": "Privacy Settings",
+        "subtitle": "Manage your profile and data"
+      }
+    }
+  },
+  "common": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "error": "An error occurred"
+  }
+}

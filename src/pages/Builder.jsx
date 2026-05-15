@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { 
+  LayoutDashboard, FileText, PlusSquare, LayoutTemplate, PenTool, 
+  FileCheck, Sparkles, MessageSquare, FileSignature, BarChart2, 
+  User, Settings, Sun, Moon, Menu
+} from "lucide-react";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import { useReactToPrint } from "react-to-print";
 import tinycolor from "tinycolor2";
 
 import Template1 from "../templates/Template1";
@@ -31,6 +35,9 @@ import { validateHumanPhoto } from "../lib/faceValidator";
 import { getCroppedImg } from "../lib/cropImage";
 import { removeBackground, blurBackground } from "../lib/bgRemoval";
 import PhotoCropModal from "../components/PhotoCropModal";
+import { getPreviewData } from "../data/templatePreviewData";
+import ProfileDropdown from "../components/ProfileDropdown";
+import NotificationDropdown from "../components/NotificationDropdown";
 
 /* -----------------------
    Theme helpers
@@ -542,10 +549,11 @@ function EmailSuggestInput({ value, onChange, className, placeholder }) {
 export default function Builder() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading } = useAuth();
 
   const [cvId, setCvId] = useState(id || null);
-  const [templateId, setTemplateId] = useState("t1");
+  const [templateId, setTemplateId] = useState(location.state?.templateId || "t1");
   const [isPublic, setIsPublic] = useState(false);
   const [views, setViews] = useState(0);
 
@@ -601,11 +609,169 @@ export default function Builder() {
   const [previewScale, setPreviewScale] = useState(1);
   const [previewPageHeight, setPreviewPageHeight] = useState(A4_MIN_HEIGHT);
 
+  // Preview view controls
+  const [viewMode, setViewMode] = useState("desktop"); // "desktop" | "mobile"
+  const [manualZoom, setManualZoom] = useState(100);   // percentage 50–150
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+
   const photoSourceUrlRef = useRef("");
   const originalPhotoUrlRef = useRef("");
   const pdfRef = useRef(null);
+  const previewContainerRef = useRef(null);
   const previewViewportRef = useRef(null);
   const previewPageRef = useRef(null);
+
+  // Wire react-to-print — produces real text-based PDFs (ATS-readable)
+  // THE AUTO-FIT SYSTEM: Calculate scale factor if content exceeds one A4 page slightly
+  const scaleFactor = useMemo(() => {
+    if (previewPageHeight <= A4_MIN_HEIGHT + 5) return 1;
+    
+    const ratio = A4_MIN_HEIGHT / previewPageHeight;
+    // Limit auto-scaling to a minimum of 0.78 (from 0.84) to handle extremely space-heavy layouts.
+    return Math.max(0.78, ratio);
+  }, [previewPageHeight]);
+
+  // Wire react-to-print — produces real text-based PDFs (ATS-readable)
+  const handlePrint = useReactToPrint({
+    contentRef: pdfRef,
+    documentTitle: () => `${cv?.fullName || "CV"} - ProCV Lite`,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 0mm;
+      }
+      @media print {
+        html, body {
+          width: 210mm;
+          height: 297mm;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background: white !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        body {
+          page-break-after: avoid !important;
+        }
+
+        #cv-render-root {
+          transform: scale(${scaleFactor});
+          transform-origin: top center;
+          width: 210mm !important;
+          height: 297mm !important;
+          margin: 0 auto !important;
+          overflow: hidden !important;
+          background: white !important;
+        }
+
+        section {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+          margin-top: 0.6rem !important;
+          margin-bottom: 0 !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+        }
+
+        /* Compact spacing for all templates */
+        .space-y-7, .space-y-6, .space-y-5 { margin-top: 0.5rem !important; }
+        .mt-14, .mt-12, .mt-10 { margin-top: 0.7rem !important; }
+        .mt-8, .mt-6 { margin-top: 0.3rem !important; }
+        .py-8, .py-7, .py-6 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+        
+        /* Grid and Flex gaps */
+        .grid-cols-2 { gap: 0.75rem 1.5rem !important; }
+        .gap-10 { gap: 0.75rem !important; }
+        .gap-6 { gap: 0.4rem !important; }
+
+        /* Template 6 (Academic) specific overrides */
+        aside section, main section {
+          margin-top: 0.4rem !important;
+          margin-bottom: 0.4rem !important;
+        }
+        
+        /* Template 5 (Modern Card) specific overrides */
+        .t5-outer-container {
+          padding: 0 !important;
+          background: white !important;
+        }
+        .t5-inner-container {
+          padding: 15px 20px !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        .t5-body-wrapper {
+          gap: 12px !important;
+        }
+        .t5-entries-wrapper {
+          gap: 10px !important;
+          margin-top: 6px !important;
+        }
+        .t5-section {
+          margin-bottom: 0.4rem !important;
+        }
+        .t5-card {
+          padding: 8px 12px !important;
+          gap: 10px !important;
+          border-radius: 8px !important;
+          margin-top: 6px !important;
+        }
+        .t5-card > div:first-child {
+          border-right-width: 1px !important;
+          padding-right: 10px !important;
+        }
+        .t5-reference-card {
+          padding: 8px 12px !important;
+          gap: 4px !important;
+          border-radius: 8px !important;
+        }
+        
+        /* Sidebar Contact and Skill pills */
+        aside section > div { 
+          gap: 6px !important; 
+          margin-bottom: 4px !important;
+        }
+
+        /* Academic Results Tables */
+        table, .grid {
+          margin-top: 4px !important;
+        }
+        /* Target Template 6 AcademicTable rows */
+        .grid div[style*="padding: 5px 12px"] {
+          padding: 3px 10px !important;
+        }
+
+        /* Text and paragraph optimizations */
+        p, li {
+          margin-top: 0.1rem !important;
+          margin-bottom: 0.1rem !important;
+          line-height: 1.38 !important;
+          font-size: 10.5px !important; /* Slightly smaller text if needed */
+        }
+
+        h1, h2, h3, h4 {
+          margin-top: 0 !important;
+          margin-bottom: 0.3rem !important;
+          line-height: 1.1 !important;
+        }
+
+        /* Avoid split icons or small bullets */
+        span, i, svg {
+          break-inside: avoid !important;
+        }
+
+        * {
+          box-sizing: border-box !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+      }
+    `,
+  });
+
 
   useEffect(() => {
     setCvId(id || null);
@@ -632,24 +798,24 @@ export default function Builder() {
 
   useEffect(() => {
     const updatePreviewScale = () => {
-      const viewport = previewViewportRef.current;
-      if (!viewport) return;
+      const container = previewContainerRef.current;
+      if (!container) return;
 
-      const availableWidth = viewport.clientWidth || A4_WIDTH;
+      const availableWidth = container.clientWidth || A4_WIDTH;
       const nextScale = Math.min(1, availableWidth / A4_WIDTH);
       setPreviewScale(nextScale);
     };
 
     updatePreviewScale();
 
-    const viewport = previewViewportRef.current;
+    const container = previewContainerRef.current;
     let resizeObserver;
 
-    if (viewport && typeof ResizeObserver !== "undefined") {
+    if (container && typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(() => {
         updatePreviewScale();
       });
-      resizeObserver.observe(viewport);
+      resizeObserver.observe(container);
     }
 
     window.addEventListener("resize", updatePreviewScale);
@@ -1027,8 +1193,9 @@ export default function Builder() {
   }, [cv.themeMode, cv.themeManual, cv.themeAutoGenerated]);
 
   const cvForRender = useMemo(() => {
+    const dataWithPreview = getPreviewData(cv);
     return {
-      ...cv,
+      ...dataWithPreview,
       theme: effectiveTheme,
     };
   }, [cv, effectiveTheme]);
@@ -1064,65 +1231,19 @@ export default function Builder() {
     setCropImageSrc("");
   };
 
-  const downloadPdf = async () => {
-    try {
-      setExportingPdf(true);
-      await new Promise((r) => setTimeout(r, 350));
-
-      const el = pdfRef.current;
-      if (!el) {
-        showToast("Export view not ready. Try again.", "error");
-        return;
-      }
-
-      const canvas = await html2canvas(el, {
-        scale: 2.5,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: A4_WIDTH,
-      });
-
-      if (!canvas?.width || !canvas?.height) {
-        showToast("PDF capture failed (empty canvas). Try again.", "error");
-        return;
-      }
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.98);
-
-      const pdf = new jsPDF("p", "pt", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      const fileName = `${sanitize(cv.fullName || "cv")}_${sanitize(
-        selectedName
-      )}.pdf`;
-
-      pdf.save(fileName);
-    } catch (err) {
-      console.error(err);
-      showToast("PDF generation failed. Check Console (F12).", "error");
-    } finally {
-      setExportingPdf(false);
+  // ── Print-based PDF export (ATS-readable, text-selectable) ─────────────────
+  const downloadPdf = () => {
+    if (!pdfRef.current) {
+      showToast("Export view not ready. Try again.", "error");
+      return;
     }
+    if (!cv.fullName && !cv.jobTitle && !cv.summary) {
+      showToast("Please fill in some CV details before exporting.", "error");
+      return;
+    }
+    handlePrint();
   };
+
 
   const executeSummaryGeneration = async () => {
     try {
@@ -1246,7 +1367,7 @@ export default function Builder() {
 
       if (!cvId) {
         setCv(EMPTY_CV);
-        setTemplateId("t1");
+        setTemplateId(location.state?.templateId || "t1");
         setIsPublic(false);
         setViews(0);
         setIsHydrated(true);
@@ -1898,6 +2019,7 @@ export default function Builder() {
 
       if (cvId) {
         await updateDoc(doc(db, "cvs", cvId), basePayload);
+        setLastSaved(new Date());
         showToast("✅ CV Updated!");
       } else {
         const docRef = await addDoc(collection(db, "cvs"), {
@@ -1908,6 +2030,7 @@ export default function Builder() {
 
         setCvId(docRef.id);
         setIsHydrated(true);
+        setLastSaved(new Date());
         showToast("✅ CV Saved!");
         navigate(`/builder/${docRef.id}`, { replace: true });
       }
@@ -1970,7 +2093,31 @@ export default function Builder() {
 
   if (loading) return <div className="p-6">Loading...</div>;
 
-  const previewWrapperHeight = previewPageHeight * previewScale;
+  const zoomFactor = manualZoom / 100;
+  const effectiveScale = previewScale * zoomFactor;
+  const previewWrapperHeight = previewPageHeight * effectiveScale;
+
+  // Public share URL for this CV
+  const shareUrl = cvId ? `${window.location.origin}/cv/${cvId}` : null;
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 2500);
+    } catch (_) {
+      // fallback
+      const el = document.createElement("textarea");
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 2500);
+    }
+  };
 
   const pageSurfaceStyle = {
     width: `${A4_WIDTH}px`,
@@ -1981,7 +2128,110 @@ export default function Builder() {
   };
 
   return (
-    <div className="min-h-screen text-white bg-transparent relative z-0">
+    <div className="flex h-screen overflow-hidden bg-[#0A0D14] text-white font-sans selection:bg-indigo-500/30">
+      
+      {/* SIDEBAR */}
+      <aside className="w-[230px] flex-shrink-0 border-r border-white/5 bg-[#0A0D14] hidden md:flex flex-col justify-between overflow-y-auto custom-scrollbar z-50">
+        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-2 p-4 pb-2">
+            <div className="bg-white/10 p-1.5 rounded-lg">
+              <FileCheck className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold tracking-tight">ProCV Lite</span>
+            <Menu className="w-5 h-5 ml-auto text-gray-400 cursor-pointer hover:text-white" />
+          </div>
+
+          {/* Profile */}
+          <div className="px-3 mb-4">
+            <div className="flex items-center gap-2 bg-[#111622] p-2 rounded-xl border border-white/5">
+              <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.displayName || 'User'}`} alt="User" className="w-full h-full object-cover" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="text-xs font-semibold truncate text-gray-200">{user?.displayName || "Prageeth Gihan"}</div>
+                <div className="text-[10px] text-gray-500 truncate">{user?.email || "prageethgihan55@gmail.com"}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-3 space-y-4">
+            {/* MAIN */}
+            <div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Main</div>
+              <div className="space-y-1">
+                <button onClick={() => navigate('/dashboard')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                </button>
+                <button onClick={() => navigate('/my-cvs')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <FileText className="w-4 h-4" /> My CVs
+                </button>
+                <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium shadow-lg shadow-indigo-500/20 transition-colors">
+                  <PlusSquare className="w-4 h-4" /> CV Builder
+                </button>
+                <button onClick={() => navigate('/templates')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <LayoutTemplate className="w-4 h-4" /> Templates
+                </button>
+              </div>
+            </div>
+
+            {/* AI TOOLS */}
+            <div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">AI Tools</div>
+              <div className="space-y-1">
+                <button onClick={() => navigate('/ai-writer')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <PenTool className="w-4 h-4" /> AI Writer
+                </button>
+                <button onClick={() => navigate('/ats-analyzer')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <FileCheck className="w-4 h-4" /> ATS Analyzer
+                </button>
+                <button onClick={() => navigate('/job-match')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <Sparkles className="w-4 h-4" /> Job Match
+                </button>
+                <button onClick={() => navigate('/interview-questions')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <MessageSquare className="w-4 h-4" /> Interview Questions
+                </button>
+                <button onClick={() => navigate('/cover-letter-generator')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                  <FileSignature className="w-4 h-4" /> Cover Letter Generator
+                </button>
+              </div>
+            </div>
+
+            {/* ANALYTICS */}
+            <div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Analytics</div>
+              <button onClick={() => navigate('/insights')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                <BarChart2 className="w-4 h-4" /> Insights & Analytics
+              </button>
+            </div>
+
+            {/* MANAGE */}
+            <div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Manage</div>
+              <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                <User className="w-4 h-4" /> My Profile
+              </button>
+              <button onClick={() => navigate('/settings')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
+                <Settings className="w-4 h-4" /> Settings
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Theme Toggle */}
+        <div className="p-3 mt-4">
+          <div className="flex items-center justify-center gap-4 bg-[#111622] p-2 rounded-2xl border border-white/5">
+            <button className="text-gray-400 hover:text-white"><Sun className="w-4 h-4" /></button>
+            <div className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer">
+              <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+            </div>
+            <button className="text-white"><Moon className="w-4 h-4" /></button>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 overflow-y-auto bg-transparent relative z-0 custom-scrollbar">
       {/* ── Modern Toast Notification ── */}
       <div
         style={{
@@ -2102,18 +2352,57 @@ export default function Builder() {
           />
         </div>
       </div>
-      <header className="border-b border-white/10 glass-panel">
-        <div className="mx-auto flex max-w-6xl items-center justify-between p-4">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0a101f]/80 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between p-4 px-6 gap-4">
           <div>
-            <div className="font-bold">CV Builder</div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white">CV Builder</h1>
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">Build your professional CV with AI assistance</p>
           </div>
 
-          <Link
-            className="rounded-xl glass-button px-3 py-2 text-sm"
-            to="/dashboard"
-          >
-            ← Back
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className="flex flex-col">
+                <span className="font-medium text-white text-[11px]">Auto-saved</span>
+                <span className="text-[10px]">
+                  {lastSaved
+                    ? lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    : cvId ? "Previously saved" : "Not saved yet"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveToFirestore}
+              className="rounded-xl border border-white/10 bg-transparent hover:bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors"
+            >
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={downloadPdf}
+              disabled={exportingPdf}
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-indigo-900/20"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              {exportingPdf ? "Preparing..." : "Download PDF"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              className="hidden sm:flex rounded-xl border border-white/10 bg-transparent hover:bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-5.368m0 5.368l5.662 3.397m-5.662-3.397l5.662-3.397m-5.662 3.397l-5.662 3.397M15.316 10.658a3 3 0 110-5.368m0 5.368a3 3 0 110 5.368m0-5.368l5.662-3.397" /></svg>
+              Share
+            </button>
+            <div className="h-8 w-px bg-white/5 mx-1 hidden sm:block"></div>
+            <NotificationDropdown />
+            <ProfileDropdown />
+          </div>
         </div>
       </header>
 
@@ -2155,11 +2444,88 @@ export default function Builder() {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-[1550px] gap-5 p-6 lg:grid-cols-5 lg:items-start">
-        <section className="min-w-0 rounded-2xl glass-panel p-5 shadow-2xl lg:col-span-2">
-          <h2 className="font-semibold">Form</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Type here and see the preview update.
+      {/* ── Share Modal ── */}
+      {showShareModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a101f]/80 backdrop-blur-md"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
+        >
+          <div className="w-[90%] max-w-md rounded-2xl bg-[#111622] border border-white/10 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-5.368m0 5.368l5.662 3.397m-5.662-3.397l5.662-3.397m-5.662 3.397l-5.662 3.397M15.316 10.658a3 3 0 110-5.368m0 5.368a3 3 0 110 5.368m0-5.368l5.662-3.397" /></svg>
+                </div>
+                <h3 className="text-lg font-bold text-white">Share CV</h3>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="rounded-lg p-1.5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {!isPublic && (
+              <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300 flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>Your CV is currently <strong>Private</strong>. Enable Public Share in the form to make this link accessible.</span>
+              </div>
+            )}
+
+            {!cvId ? (
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">
+                Save your CV first to get a shareable link.
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium text-gray-400 mb-1.5 block">Shareable Link</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 rounded-xl bg-[#0a101f] border border-white/10 px-3 py-2 text-sm text-gray-300 truncate">
+                    {shareUrl}
+                  </div>
+                  <button
+                    onClick={handleCopyShareLink}
+                    className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                      shareLinkCopied
+                        ? "bg-emerald-600 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                    }`}
+                  >
+                    {shareLinkCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 pt-4 border-t border-white/5 flex gap-3">
+              <a
+                href={shareUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium transition-colors ${
+                  !cvId ? "opacity-40 pointer-events-none text-gray-400" : "hover:bg-white/5 text-white"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                Open in new tab
+              </a>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="mx-auto grid max-w-7xl gap-5 p-4 sm:p-6 lg:grid-cols-5 lg:items-start w-full">
+        <section className="min-w-0 rounded-2xl bg-[#111622] border border-white/5 p-6 lg:col-span-2 shadow-[0_0_15px_rgba(0,0,0,0.2)]">
+          <h2 className="text-[17px] font-bold text-white">Form</h2>
+          <p className="mt-1 text-xs text-gray-400">
+            Type here and see the preview update in real-time.
           </p>
 
           {aiError && (
@@ -2169,22 +2535,28 @@ export default function Builder() {
           )}
 
           <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between rounded-xl glass-panel px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold">Public Share</div>
-                <div className="text-xs text-gray-400">
-                  Enable this to allow anyone to view your CV link.
+            <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-[#1e2336] px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                 </div>
-                {cvId && (
-                  <div className="mt-1 text-[11px] text-gray-400">
-                    Views: {views}
+                <div>
+                  <div className="text-sm font-semibold text-white">Public Share</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    Enable this to allow anyone to view your CV link.
                   </div>
-                )}
+                  {cvId && (
+                    <div className="mt-1 text-[11px] text-gray-500">
+                      Views: {views}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm text-white font-medium cursor-pointer">
                 <input
                   type="checkbox"
+                  className="w-4 h-4 rounded border-white/20 bg-black/20 text-indigo-500 focus:ring-indigo-500/50"
                   checked={isPublic}
                   onChange={(e) => setIsPublic(e.target.checked)}
                 />
@@ -2192,12 +2564,17 @@ export default function Builder() {
               </label>
             </div>
 
-            <div className="rounded-xl glass-panel p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold">Profile Photo</div>
-                  <div className="text-xs text-gray-400">
-                    Auto-crops to a shoulders-up portrait. Adjust manually only if you want to change the framing.
+            <div className="rounded-2xl border border-white/5 bg-[#1e2336] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-white">Profile Photo</div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Auto-crop to a shoulders-up portrait. Adjust manually only if you want to change the framing.
+                    </div>
                   </div>
                 </div>
 
@@ -2205,17 +2582,22 @@ export default function Builder() {
                   <img
                     src={cv.photoDataUrl}
                     alt="profile"
-                    className="h-12 w-12 rounded-full border object-cover"
+                    className="h-12 w-12 shrink-0 rounded-full border border-white/10 object-cover"
                   />
                 ) : (
-                  <div className="h-12 w-12 rounded-full border bg-gray-100" />
+                  <img
+                    src="https://api.dicebear.com/9.x/initials/svg?seed=PG&backgroundColor=312e81"
+                    alt="profile"
+                    className="h-12 w-12 shrink-0 rounded-full border border-white/10 object-cover"
+                  />
                 )}
               </div>
 
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 sm:ml-13 space-y-4">
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
+                  className="block w-full text-sm text-gray-400 file:mr-4 file:rounded-xl file:border file:border-white/10 file:bg-transparent file:px-4 file:py-1.5 file:text-sm file:text-white hover:file:bg-white/5 file:cursor-pointer file:transition-colors"
                   onChange={async (e) => {
                     const file = e.target.files?.[0] || null;
 
@@ -2268,7 +2650,6 @@ export default function Builder() {
                       e.target.value = "";
                     }
                   }}
-                  className="block w-full text-sm"
                 />
 
                 <div className="rounded-xl glass-panel p-3">
@@ -2320,7 +2701,7 @@ export default function Builder() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 mt-4">
                   <button
                     type="button"
                     onClick={handleUploadPhoto}
@@ -2330,7 +2711,7 @@ export default function Builder() {
                       isAdjustingCrop ||
                       photoProcessing
                     }
-                    className="rounded-lg glass-primary-button px-3 py-2 text-sm disabled:opacity-50"
+                    className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-900/20 disabled:opacity-50 transition-colors"
                   >
                     {uploadingPhoto ? "Processing..." : "Auto Crop & Upload"}
                   </button>
@@ -2471,16 +2852,16 @@ export default function Builder() {
               </div>
             )}
 
-            <div className="rounded-xl glass-panel p-4">
-              <div className="flex items-center justify-between gap-3">
+            <div className="rounded-2xl border border-white/5 bg-[#0f172a]/40 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold">Theme</div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm font-semibold text-white">Theme</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
                     Auto from photo or choose your own.
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-xl border border-white/10 bg-[#0a101f]/50 p-1">
                   <button
                     type="button"
                     onClick={() =>
@@ -2489,10 +2870,10 @@ export default function Builder() {
                         themeMode: "default",
                       }))
                     }
-                    className={`rounded-lg border px-3 py-1 text-sm ${
+                    className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
                       cv.themeMode === "default"
-                        ? "bg-black text-white"
-                        : "hover:bg-gray-50"
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/20"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Default
@@ -2506,10 +2887,10 @@ export default function Builder() {
                         themeMode: "auto",
                       }))
                     }
-                    className={`rounded-lg border px-3 py-1 text-sm ${
+                    className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
                       cv.themeMode === "auto"
-                        ? "bg-black text-white"
-                        : "hover:bg-gray-50"
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/20"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Auto
@@ -2524,10 +2905,10 @@ export default function Builder() {
                         themeManual: p.themeManual || PRESETS[0].theme,
                       }))
                     }
-                    className={`rounded-lg border px-3 py-1 text-sm ${
+                    className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
                       cv.themeMode === "manual"
-                        ? "bg-black text-white"
-                        : "hover:bg-gray-50"
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/20"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Manual
@@ -2564,7 +2945,7 @@ export default function Builder() {
                   </div>
                 </div>
               ) : cv.themeMode !== "default" ? (
-                <div className="mt-3 text-sm text-gray-400">
+                <div className="mt-4 text-xs text-gray-500">
                   Upload a photo to generate Auto Theme, or switch to Manual.
                 </div>
               ) : null}
@@ -2680,21 +3061,21 @@ export default function Builder() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
                   <button
                     type="button"
                     onClick={handleGenerateSummary}
                     disabled={isGeneratingSummary || summaryAiLoading}
-                    className="rounded-lg bg-emerald-600/20 border border-emerald-500/50 px-3 py-1 text-xs text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50 transition-all font-medium"
+                    className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors font-medium flex items-center gap-1.5"
                   >
-                    {isGeneratingSummary ? "Generating..." : "✨ Generate Summary with AI"}
+                    ✨ {isGeneratingSummary ? "Generating..." : "Generate Summary with AI"}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => runSummaryAi("fix")}
                     disabled={summaryAiLoading || isGeneratingSummary}
-                    className="glass-button rounded-lg px-3 py-1 text-xs disabled:opacity-50"
+                    className="rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs text-gray-300 hover:bg-white/5 disabled:opacity-50 transition-colors"
                   >
                     {summaryAiLoading ? "Working..." : "Fix Grammar"}
                   </button>
@@ -2703,7 +3084,7 @@ export default function Builder() {
                     type="button"
                     onClick={() => runSummaryAi("improve")}
                     disabled={summaryAiLoading || isGeneratingSummary}
-                    className="rounded-lg bg-black px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                    className="rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs text-gray-300 hover:bg-white/5 disabled:opacity-50 transition-colors"
                   >
                     {summaryAiLoading ? "Working..." : "Improve with AI"}
                   </button>
@@ -2782,14 +3163,14 @@ export default function Builder() {
               </div>
             </div>
 
-            {/* Custom Sections — Template 3, 4, 5 only */}
-            {["t3", "t4", "t5"].includes(templateId) && (
+            {/* Custom Sections — Template 3, 4, 5, 6 */}
+            {["t3", "t4", "t5", "t6"].includes(templateId) && (
               <div className="rounded-xl glass-panel p-4">
                 <div className="flex items-center justify-between mb-1">
                   <div>
                     <div className="text-sm font-semibold">Custom Sections</div>
                     <div className="text-xs text-gray-400 mt-0.5">
-                      Visible in Templates 3, 4 &amp; 5. e.g. Certifications, Publications, Volunteering.
+                      Visible in Templates 3, 4, 5 &amp; 6. e.g. Certifications, Publications, Volunteering.
                     </div>
                   </div>
                   <button
@@ -3591,28 +3972,22 @@ export default function Builder() {
               </div>
             )}
 
-            <button
-              type="button"
-              className="rounded-xl glass-primary-button px-4 py-2"
-              onClick={handleSaveToFirestore}
-            >
-              {cvId ? "Update" : "Save"}
-            </button>
+
           </div>
         </section>
 
         {/* Sticky wrapper — desktop only */}
-        <div className="lg:col-span-3 lg:sticky lg:top-6" style={{ maxHeight: "calc(100vh - 3rem)", overflowY: "auto" }}>
-        <section className="rounded-2xl glass-panel p-5 shadow-2xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="lg:col-span-3 lg:sticky lg:top-[5.5rem]" style={{ maxHeight: "calc(100vh - 6.5rem)", overflowY: "auto", overflowX: "hidden" }}>
+        <section className="rounded-2xl bg-[#111622] border border-white/5 p-6 shadow-[0_0_15px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
             <div>
-              <h2 className="font-semibold">Live Preview</h2>
-              <div className="text-xs text-gray-400">{selectedName}</div>
+              <h2 className="text-[17px] font-bold text-white">Live Preview</h2>
+              <div className="text-xs text-gray-400 mt-0.5">{selectedName}</div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <CustomSelect
-                className="w-48"
+                className="w-56"
                 value={templateId}
                 onChange={(val) => setTemplateId(val)}
                 options={[
@@ -3625,25 +4000,53 @@ export default function Builder() {
                 ]}
               />
 
-              <button
-                type="button"
-                onClick={downloadPdf}
-                disabled={exportingPdf}
-                className="rounded-xl glass-primary-button px-4 py-2 text-sm disabled:opacity-50"
-              >
-                {exportingPdf ? "Generating..." : "Download PDF"}
-              </button>
+              <div className="hidden sm:flex items-center rounded-xl border border-white/10 bg-[#0a101f]/50 p-1">
+                 <button
+                   title="Desktop view"
+                   onClick={() => setViewMode("desktop")}
+                   className={`rounded-lg px-2.5 py-1.5 transition-colors ${
+                     viewMode === "desktop"
+                       ? "bg-white/10 text-indigo-400 shadow-sm"
+                       : "text-gray-500 hover:text-white"
+                   }`}
+                 >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                 </button>
+                 <button
+                   title="Mobile view"
+                   onClick={() => setViewMode("mobile")}
+                   className={`rounded-lg px-2.5 py-1.5 transition-colors ${
+                     viewMode === "mobile"
+                       ? "bg-white/10 text-indigo-400 shadow-sm"
+                       : "text-gray-500 hover:text-white"
+                   }`}
+                 >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                 </button>
+              </div>
+
+
             </div>
           </div>
 
           <div className="mt-4">
+            {/* Scrollable preview viewport: horizontal scroll when zoomed > 100% */}
             <div
-              ref={previewViewportRef}
-              className="w-full overflow-hidden rounded-xl"
+              ref={previewContainerRef}
+              style={{
+                width: "100%",
+                overflowX: manualZoom > 100 ? "auto" : "hidden",
+                overflowY: "hidden",
+                borderRadius: "12px",
+                ...(viewMode === "mobile" ? { maxWidth: "390px", margin: "0 auto" } : {}),
+              }}
             >
+              {/* This div reserves the scaled width so scroll range is correct */}
               <div
+                ref={previewViewportRef}
                 style={{
                   height: `${previewWrapperHeight}px`,
+                  width: `${Math.max(A4_WIDTH * effectiveScale, 1)}px`,
                   position: "relative",
                 }}
               >
@@ -3654,7 +4057,7 @@ export default function Builder() {
                     position: "absolute",
                     left: 0,
                     top: 0,
-                    transform: `scale(${previewScale})`,
+                    transform: `scale(${effectiveScale})`,
                     transformOrigin: "top left",
                   }}
                 >
@@ -3663,32 +4066,60 @@ export default function Builder() {
               </div>
             </div>
 
-            {exportingPdf && (
+            {/* ── Hidden print target — always mounted, off-screen, no clipping ── */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: "fixed",
+                left: "-9999px",
+                top: 0,
+                width: `${A4_WIDTH}px`,
+                overflow: "visible",
+                background: "#ffffff",
+                pointerEvents: "none",
+                zIndex: -1,
+              }}
+            >
               <div
+                ref={pdfRef}
+                id="cv-render-root"
                 style={{
-                  position: "fixed",
-                  left: "-10000px",
-                  top: 0,
                   width: `${A4_WIDTH}px`,
+                  minHeight: `${A4_MIN_HEIGHT}px`,
                   background: "#ffffff",
-                  pointerEvents: "none",
-                  zIndex: -1,
+                  boxSizing: "border-box",
+                  overflow: "visible",
                 }}
               >
-                <div ref={pdfRef} style={pageSurfaceStyle}>
-                  <SelectedPdfTemplate
-                    cv={{
-                      ...cvForRender,
-                      photoDataUrl: cv.photoDataUrlHd || cv.photoDataUrl,
-                    }}
-                  />
-                </div>
+                <SelectedPdfTemplate
+                  cv={{
+                    ...cvForRender,
+                    photoDataUrl: cv.photoDataUrlHd || cv.photoDataUrl,
+                  }}
+                />
               </div>
-            )}
+            </div>
           </div>
         </section>
         </div>{/* end sticky wrapper */}
       </main>
+      </div>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+      `}</style>
     </div>
   );
 }

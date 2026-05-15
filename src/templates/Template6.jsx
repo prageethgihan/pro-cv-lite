@@ -26,6 +26,14 @@ export default function Template6({ cv }) {
   const website = cv.contact?.website?.trim() || "";
   const hasContact = phone || email || address || website;
 
+  const name = (cv.fullName || "YOUR NAME").trim();
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+
   /* ── theme ──────────────────────────────────────────────── */
   const theme      = cv.theme || {};
   const SIDEBAR_BG = theme.primary   || "#1c3d2e";   /* deep forest green */
@@ -44,7 +52,7 @@ export default function Template6({ cv }) {
     <div
       style={{
         display: "flex",
-        minHeight: "980px",
+        minHeight: "100%",
         fontFamily: FONT,
         backgroundColor: "#fff",
         boxSizing: "border-box",
@@ -86,8 +94,16 @@ export default function Template6({ cv }) {
                 margin: "0 auto",
                 background: "rgba(255,255,255,0.08)",
                 border: "2px solid rgba(255,255,255,0.16)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "36px",
+                fontWeight: "bold",
+                color: "rgba(255,255,255,0.8)",
               }}
-            />
+            >
+              {initials || "YN"}
+            </div>
           )}
         </div>
 
@@ -387,6 +403,26 @@ export default function Template6({ cv }) {
           </MainSection>
         )}
 
+        {/* ── Custom Sections (Moved below Education) ── */}
+        {(cv.customSections ?? [])
+          .filter((s) => s.title?.trim() || s.content?.trim())
+          .map((s, i) => (
+            <MainSection key={i} title={(s.title || "Section").toUpperCase()} accent={ACCENT} divider={DIVIDER}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "9.5px",
+                  lineHeight: 1.6,
+                  color: BODY_TEXT,
+                  textAlign: "justify",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {s.content}
+              </p>
+            </MainSection>
+          ))}
+
         {/* ── A/L Results ── */}
         {hasAl && (
           <MainSection title="G.C.E. ADVANCED LEVEL (A/L) RESULTS" accent={ACCENT} divider={DIVIDER}>
@@ -482,6 +518,60 @@ export default function Template6({ cv }) {
           </MainSection>
         )}
 
+        {/* ── Extracurricular Activities ── */}
+        {extracurricular.length > 0 && (
+          <MainSection title="EXTRACURRICULAR ACTIVITIES" accent={ACCENT} divider={DIVIDER}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {extracurricular.map((item, i) => (
+                <div key={i}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      gap: "8px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: BODY_TEXT }}>
+                      {item.activity || "Activity"}
+                    </div>
+                    {item.year && (
+                      <span
+                        style={{
+                          fontSize: "9.5px",
+                          color: META_TEXT,
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {item.year}
+                      </span>
+                    )}
+                  </div>
+                  {(item.role || item.organization) && (
+                    <div style={{ fontSize: "10px", color: META_TEXT, marginTop: "2px" }}>
+                      {[item.role, item.organization].filter(Boolean).join(" at ")}
+                    </div>
+                  )}
+                  {item.description?.trim() && (
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: "9.5px",
+                        color: BODY_TEXT,
+                        lineHeight: 1.5,
+                        textAlign: "justify",
+                      }}
+                    >
+                      {item.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </MainSection>
+        )}
+
         {/* ── Footer rule ── */}
         <div
           style={{
@@ -501,7 +591,7 @@ export default function Template6({ cv }) {
 /** Dark sidebar block with section title */
 function SideBlock({ title, children }) {
   return (
-    <div
+    <section
       style={{
         padding: "10px 14px 6px",
         borderTop: "1px solid rgba(255,255,255,0.09)",
@@ -520,7 +610,7 @@ function SideBlock({ title, children }) {
         {title}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -576,7 +666,7 @@ function ContactRow({ icon, label, value }) {
 /** Main section with accent bar + uppercase title + divider line */
 function MainSection({ title, accent, divider, children }) {
   return (
-    <div style={{ marginBottom: "16px" }}>
+    <section style={{ marginBottom: "16px" }}>
       <div
         style={{
           display: "flex",
@@ -609,7 +699,7 @@ function MainSection({ title, accent, divider, children }) {
         <div style={{ flex: 1, height: "1px", background: divider }} />
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 

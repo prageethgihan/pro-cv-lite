@@ -77,20 +77,21 @@ export default function Template5({ cv }) {
 
   return (
     <div
+      className="t5-outer-container"
       style={{
         backgroundColor: "#f4f6f8",
-        minHeight: "980px",
+        minHeight: "100%",
         padding: "24px",
         boxSizing: "border-box",
       }}
     >
       <div
+        className="t5-inner-container"
         style={{
           backgroundColor: bg,
           borderRadius: "24px",
           padding: "36px 40px",
           position: "relative",
-          overflow: "hidden",
           boxShadow: "0 10px 40px -10px rgba(0,0,0,0.05)",
         }}
       >
@@ -234,10 +235,10 @@ export default function Template5({ cv }) {
         </div>
 
         {/* ═══════════════ CONTENT ═══════════════ */}
-        <div style={{ position: "relative", zIndex: 1, display: "grid", gap: "28px" }}>
+        <div className="t5-body-wrapper" style={{ position: "relative", zIndex: 1, display: "grid", gap: "28px" }}>
           
           {/* PROFILE SUMMARY */}
-          <section>
+          <section className="t5-section">
             <p
               style={{
                 margin: 0,
@@ -254,10 +255,10 @@ export default function Template5({ cv }) {
           </section>
 
           {/* TWO COLUMN GRID FOR INFO -> CHANGED TO CONTINUOUS FLOW COMPOSITIONS */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "32px", marginTop: "12px" }}>
+          <div className="t5-entries-wrapper" style={{ display: "flex", flexDirection: "column", gap: "32px", marginTop: "12px" }}>
             
             {/* EXPERIENCE */}
-            <section>
+            <section className="t5-section">
               <T5SectionTitle title="EXPERIENCE" color={pri} accent={acc} />
               {exp.length === 0 ? (
                 <p style={{ fontSize: "12px", color: sec, marginTop: "12px" }}>
@@ -268,6 +269,7 @@ export default function Template5({ cv }) {
                   {exp.map((j, i) => (
                     <div
                       key={i}
+                      className="t5-card"
                       style={{
                         backgroundColor: colors.card,
                         borderRadius: "16px",
@@ -331,14 +333,169 @@ export default function Template5({ cv }) {
               )}
             </section>
 
+            {/* EDUCATION */}
+            {education.length > 0 && (
+              <section className="t5-section">
+                <T5SectionTitle title="EDUCATION" color={pri} accent={acc} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
+                  {education.map((item, i) => (
+                    <div
+                      key={i}
+                      className="t5-card"
+                      style={{
+                        backgroundColor: colors.card,
+                        borderRadius: "16px",
+                        padding: "18px 20px",
+                        border: `1px solid ${priLight}`,
+                        display: "grid",
+                        gridTemplateColumns: "1fr 2.2fr",
+                        gap: "24px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ borderRight: `1px solid ${priLight}`, paddingRight: "16px" }}>
+                        <div style={{ fontSize: "14px", fontWeight: 800, color: pri, lineHeight: 1.3 }}>
+                          {item.degree || "Degree"}
+                        </div>
+                        {item.years && (
+                          <div style={{ fontSize: "11px", color: acc, fontWeight: 700, marginTop: "6px" }}>
+                            {item.years}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        {item.university && (
+                          <div style={{ fontSize: "13px", color: pri, fontWeight: 600 }}>
+                            {item.university}
+                          </div>
+                        )}
+                        {item.details && (
+                          <p style={{ margin: "4px 0 0", fontSize: "11px", color: textCol, lineHeight: 1.6, textAlign: "justify" }}>
+                            {item.details}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* CUSTOM SECTIONS */}
+            {(cv.customSections ?? []).filter((s) => s.title?.trim() || s.content?.trim()).map((s, i) => (
+              <section key={i} className="t5-section">
+                <T5SectionTitle title={(s.title || "Section").toUpperCase()} color={pri} accent={acc} />
+                <div className="t5-card" style={{ 
+                  backgroundColor: colors.card,
+                  borderRadius: "16px",
+                  padding: "20px",
+                  border: `1px solid ${priLight}`,
+                  marginTop: "16px"
+                }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "13px",
+                      lineHeight: 1.85,
+                      color: textCol,
+                      textAlign: "justify",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {s.content}
+                  </p>
+                </div>
+              </section>
+            ))}
+
+            {/* SPLIT GRID FOR BOTTOM ITEMS: SKILLS, LANGUAGES */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+              {/* SKILLS */}
+              {skills.length > 0 && (
+                <section>
+                  <T5SectionTitle title="SKILLS" color={pri} accent={acc} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    {skills.map((s, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: "10px",
+                          backgroundColor: pri,
+                          color: bg,
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          letterSpacing: "0.5px"
+                        }}
+                      >
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* LANGUAGES */}
+              {languages.length > 0 && (
+                <section>
+                  <T5SectionTitle title="LANGUAGES" color={pri} accent={acc} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    {languages.map((lang, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: "10px",
+                          border: `1.5px solid ${acc}`,
+                          color: acc,
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          backgroundColor: accLight
+                        }}
+                      >
+                        {lang}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* CORE COMPETENCIES */}
+            {(cv.coreCompetencies ?? []).filter((c) => c.trim()).length > 0 && (
+              <section className="t5-section">
+                <T5SectionTitle title="CORE COMPETENCIES" color={pri} accent={acc} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                  {(cv.coreCompetencies ?? []).filter((c) => c.trim()).map((comp, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "10px",
+                        backgroundColor: pri,
+                        color: bg,
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      {comp}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* EXTRACURRICULAR ACTIVITIES */}
             {extracurricular.length > 0 && (
-              <section>
+              <section className="t5-section">
                 <T5SectionTitle title="EXTRACURRICULAR ACTIVITIES" color={pri} accent={acc} />
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
                   {extracurricular.map((item, i) => (
                     <div
                       key={i}
+                      className="t5-card"
                       style={{
                         backgroundColor: colors.card,
                         borderRadius: "16px",
@@ -404,140 +561,15 @@ export default function Template5({ cv }) {
               </section>
             )}
 
-            {/* EDUCATION */}
-            {education.length > 0 && (
-              <section>
-                <T5SectionTitle title="EDUCATION" color={pri} accent={acc} />
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
-                  {education.map((item, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        backgroundColor: colors.card,
-                        borderRadius: "16px",
-                        padding: "18px 20px",
-                        border: `1px solid ${priLight}`,
-                        display: "grid",
-                        gridTemplateColumns: "1fr 2.2fr",
-                        gap: "24px",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div style={{ borderRight: `1px solid ${priLight}`, paddingRight: "16px" }}>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: pri, lineHeight: 1.3 }}>
-                          {item.degree || "Degree"}
-                        </div>
-                        {item.years && (
-                          <div style={{ fontSize: "11px", color: acc, fontWeight: 700, marginTop: "6px" }}>
-                            {item.years}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div>
-                        {item.university && (
-                          <div style={{ fontSize: "13px", color: pri, fontWeight: 600 }}>
-                            {item.university}
-                          </div>
-                        )}
-                        {item.details && (
-                          <p style={{ margin: "4px 0 0", fontSize: "11px", color: textCol, lineHeight: 1.6, textAlign: "justify" }}>
-                            {item.details}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* SPLIT GRID FOR BOTTOM ITEMS: SKILLS, LANGUAGES */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-              {/* SKILLS */}
-              {skills.length > 0 && (
-                <section>
-                  <T5SectionTitle title="SKILLS" color={pri} accent={acc} />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    {skills.map((s, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "10px",
-                          backgroundColor: pri,
-                          color: bg,
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          letterSpacing: "0.5px"
-                        }}
-                      >
-                        {s}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* LANGUAGES */}
-              {languages.length > 0 && (
-                <section>
-                  <T5SectionTitle title="LANGUAGES" color={pri} accent={acc} />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    {languages.map((lang, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "10px",
-                          border: `1.5px solid ${acc}`,
-                          color: acc,
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          backgroundColor: accLight
-                        }}
-                      >
-                        {lang}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-
-            {/* CORE COMPETENCIES */}
-            {(cv.coreCompetencies ?? []).filter((c) => c.trim()).length > 0 && (
-              <section>
-                <T5SectionTitle title="CORE COMPETENCIES" color={pri} accent={acc} />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                  {(cv.coreCompetencies ?? []).filter((c) => c.trim()).map((comp, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "10px",
-                        backgroundColor: pri,
-                        color: bg,
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        letterSpacing: "0.5px",
-                      }}
-                    >
-                      {comp}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
             {/* REFERENCES */}
             {references.length > 0 && (
-              <section>
+              <section className="t5-section">
                 <T5SectionTitle title="REFERENCES" color={pri} accent={acc} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "16px" }}>
                   {references.map((ref, i) => (
                     <div
                       key={i}
+                      className="t5-reference-card"
                       style={{
                         padding: "16px",
                         borderRadius: "14px",

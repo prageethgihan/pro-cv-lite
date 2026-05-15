@@ -77,7 +77,7 @@ export default function Template3({ cv }) {
     <div
       style={{
         backgroundColor: colors.bg,
-        minHeight: "980px",
+        minHeight: "100%",
         padding: "48px 52px",
         boxSizing: "border-box",
         fontFamily: "'Inter', sans-serif",
@@ -224,49 +224,6 @@ export default function Template3({ cv }) {
           </SectionRow>
         )}
 
-        {/* EXTRACURRICULAR ACTIVITIES */}
-        {extracurricular.length > 0 && (
-          <SectionRow title="ACTIVITIES" pri={pri}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              {extracurricular.map((item, i) => (
-                <div key={i}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: textCol }}>
-                      {item.activity || "Activity"}
-                      {item.role || item.organization ? (
-                        <span style={{ fontWeight: 400, color: sec }}>
-                          , {[item.role, item.organization].filter(Boolean).join(" at ")}
-                        </span>
-                      ) : null}
-                    </div>
-                    {item.year && (
-                      <div style={{ fontSize: "11px", fontWeight: 600, color: pri, flexShrink: 0 }}>
-                        {item.year}
-                      </div>
-                    )}
-                  </div>
-                  {item.description && (
-                    <p
-                      style={{
-                        margin: "8px 0 0",
-                        fontSize: "12px",
-                        lineHeight: 1.6,
-                        color: textCol,
-                        textAlign: "justify",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      <span style={{ paddingLeft: "10px", display: "block" }}>
-                        {item.description}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </SectionRow>
-        )}
-
         {/* EDUCATION */}
         {education.length > 0 && (
           <SectionRow title="EDUCATION" pri={pri}>
@@ -307,6 +264,26 @@ export default function Template3({ cv }) {
             </div>
           </SectionRow>
         )}
+
+        {/* CUSTOM SECTIONS — array, rendered in insertion order */}
+        {(cv.customSections ?? []).filter((s) => s.title?.trim() || s.content?.trim()).map((s, i) => (
+          <SectionRow key={i} title={(s.title || "Section").toUpperCase()} pri={pri}>
+            {s.content?.trim() && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  lineHeight: 1.7,
+                  color: textCol,
+                  textAlign: "justify",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {s.content}
+              </p>
+            )}
+          </SectionRow>
+        ))}
 
         {/* SKILLS */}
         {skills.length > 0 && (
@@ -395,25 +372,48 @@ export default function Template3({ cv }) {
           </SectionRow>
         )}
 
-        {/* CUSTOM SECTIONS — array, rendered in insertion order */}
-        {(cv.customSections ?? []).filter((s) => s.title?.trim()).map((s, i) => (
-          <SectionRow key={i} title={s.title.toUpperCase()} pri={pri}>
-            {s.content?.trim() && (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "12px",
-                  lineHeight: 1.7,
-                  color: textCol,
-                  textAlign: "justify",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {s.content}
-              </p>
-            )}
+        {/* EXTRACURRICULAR ACTIVITIES */}
+        {extracurricular.length > 0 && (
+          <SectionRow title="ACTIVITIES" pri={pri}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {extracurricular.map((item, i) => (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: textCol }}>
+                      {item.activity || "Activity"}
+                      {item.role || item.organization ? (
+                        <span style={{ fontWeight: 400, color: sec }}>
+                          , {[item.role, item.organization].filter(Boolean).join(" at ")}
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.year && (
+                      <div style={{ fontSize: "11px", fontWeight: 600, color: pri, flexShrink: 0 }}>
+                        {item.year}
+                      </div>
+                    )}
+                  </div>
+                  {item.description && (
+                    <p
+                      style={{
+                        margin: "8px 0 0",
+                        fontSize: "12px",
+                        lineHeight: 1.6,
+                        color: textCol,
+                        textAlign: "justify",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      <span style={{ paddingLeft: "10px", display: "block" }}>
+                        {item.description}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </SectionRow>
-        ))}
+        )}
 
         {/* REFERENCES */}
         {references.length > 0 && (
@@ -456,7 +456,7 @@ export default function Template3({ cv }) {
 /* ── Minimalist Editorial Section Row ── */
 function SectionRow({ title, pri, children }) {
   return (
-    <div
+    <section
       style={{
         display: "grid",
         gridTemplateColumns: "140px 1fr",
@@ -477,6 +477,6 @@ function SectionRow({ title, pri, children }) {
         {title}
       </div>
       <div>{children}</div>
-    </div>
+    </section>
   );
 }

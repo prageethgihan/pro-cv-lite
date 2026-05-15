@@ -219,18 +219,6 @@ export default function Template2({ cv }) {
       .map((line) => line.replace(/^•\s*/, ""));
   };
 
-  const languageDots = (lang) => {
-    const lower = (lang || "").toLowerCase();
-
-    if (lower.includes("english")) return 5;
-    if (lower.includes("french")) return 4;
-    if (lower.includes("german")) return 3;
-    if (lower.includes("spanish")) return 2;
-    if (lower.includes("sinhala")) return 5;
-
-    return 3;
-  };
-
   return (
     <div
       className="border"
@@ -335,37 +323,9 @@ export default function Template2({ cv }) {
           </SidebarSection>
 
           <SidebarSection title="LANGUAGES" colors={colors}>
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {languagesToRender.map((lang, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-[1fr_auto] items-center gap-3"
-                >
-                  <div className="flex items-start gap-2">
-                    <span
-                      className="mt-[7px] inline-block h-[4px] w-[4px] rounded-full"
-                      style={{ backgroundColor: colors.bullet }}
-                    />
-                    <span className="text-[12px] leading-[1.45] text-[#56606e]">
-                      {lang}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-[4px]">
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-block h-[8px] w-[8px] rounded-full"
-                        style={{
-                          backgroundColor:
-                            idx < languageDots(lang)
-                              ? colors.dotOn
-                              : colors.dotOff,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <BulletLine key={i} text={lang} />
               ))}
             </div>
           </SidebarSection>

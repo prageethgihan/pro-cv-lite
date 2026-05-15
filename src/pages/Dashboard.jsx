@@ -10,48 +10,103 @@ import {
   QrCode, Download, Eye, FilePlus, Share2, MoreVertical, 
   Lightbulb, ArrowRight, Menu 
 } from "lucide-react";
+import { motion } from "framer-motion";
+import ProfileDropdown from "../components/ProfileDropdown";
+import NotificationDropdown from "../components/NotificationDropdown";
+import { useThemeContext } from "../context/ThemeContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { theme, setTheme } = useThemeContext();
   const [cvs, setCvs] = useState([]);
 
   useEffect(() => {
     if (loading || !user) return;
-    const q = query(collection(db, "cvs"), where("ownerId", "==", user.uid), orderBy("updatedAt", "desc"));
+    
+    // Removed orderBy to prevent Firestore 400 Missing Index errors
+    const q = query(collection(db, "cvs"), where("ownerId", "==", user.uid));
+    
     const unsub = onSnapshot(q, (snap) => {
-      setCvs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort locally
+      docs.sort((a, b) => {
+        const timeA = a.updatedAt?.seconds || 0;
+        const timeB = b.updatedAt?.seconds || 0;
+        return timeB - timeA;
+      });
+      setCvs(docs);
+    }, (error) => {
+      console.error("Dashboard Firestore listener error:", error);
     });
-    return () => unsub();
+    
+    return () => {
+      if (typeof unsub === 'function') {
+        unsub();
+      }
+    };
   }, [user, loading]);
 
   const userName = user?.displayName?.split(' ')[0] || "Nethma";
   const userFullName = user?.displayName || "Nethma Wanniarachchi";
   const userEmail = user?.email || "nethma@example.com";
   
-  const mockCvs = [
-    { id: 1, title: "Software Engineer CV", date: "Updated May 30, 2025", status: "Published", views: 342, downloads: 128 },
-    { id: 2, title: "Product Manager CV", date: "Updated May 28, 2025", status: "Published", views: 276, downloads: 97 },
-    { id: 3, title: "UX Designer CV", date: "Updated May 25, 2025", status: "Draft", views: 124, downloads: 32 },
-    { id: 4, title: "Data Analyst CV", date: "Updated May 20, 2025", status: "Published", views: 198, downloads: 68 },
-  ];
+  const totalCvs = cvs.length;
+  const totalViews = cvs.reduce((sum, cv) => sum + (cv.views || 0), 0);
+  const totalDownloads = cvs.reduce((sum, cv) => sum + (cv.downloads || 0), 0);
+  const totalQrScans = cvs.reduce((sum, cv) => sum + (cv.qrScans || 0), 0);
 
-  const displayCvs = cvs.length >= 4 ? cvs.map((c) => ({
+  const displayCvs = cvs.map((c) => ({
     id: c.id,
     title: c.title || "Untitled CV",
     date: `Updated ${new Date(c.updatedAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`,
     status: c.isPublished ? "Published" : "Draft",
     views: c.views || 0,
     downloads: c.downloads || 0
-  })).slice(0, 4) : mockCvs;
+  })).slice(0, 4);
 
-  const recentActivity = [
-    { id: 1, action: "Someone viewed your", cv: "Software Engineer CV", time: "2 minutes ago", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20" },
-    { id: 2, action: "Your CV was downloaded", cv: "Product Manager CV", time: "15 minutes ago", icon: Download, color: "text-emerald-400", bg: "bg-emerald-500/20" },
-    { id: 3, action: "QR code scanned", cv: "Software Engineer CV", time: "1 hour ago", icon: QrCode, color: "text-yellow-400", bg: "bg-yellow-500/20" },
-    { id: 4, action: "Someone viewed your", cv: "UX Designer CV", time: "2 hours ago", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20" },
-    { id: 5, action: "Your CV was downloaded", cv: "Data Analyst CV", time: "3 hours ago", icon: Download, color: "text-emerald-400", bg: "bg-emerald-500/20" },
-  ];
+  const timeAgo = (date) => {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval >= 1) return Math.floor(interval) + " minutes ago";
+    return "Just now";
+  };
+
+  const recentActivity = cvs.map(cv => {
+    const date = new Date(cv.updatedAt?.seconds * 1000 || Date.now());
+    return {
+      id: cv.id,
+      action: cv.isPublished ? "Published" : "Updated",
+      cv: cv.title || "Untitled CV",
+      timestamp: date,
+      time: timeAgo(date),
+      icon: cv.isPublished ? FileCheck : FileText,
+      color: cv.isPublished ? "text-emerald-400" : "text-blue-400",
+      bg: cv.isPublished ? "bg-emerald-500/20" : "bg-blue-500/20"
+    };
+  })
+  .sort((a, b) => b.timestamp - a.timestamp)
+  .slice(0, 5);
+
+  if (recentActivity.length === 0) {
+    recentActivity.push({
+      id: 'welcome',
+      action: "Welcome to ProCV Lite",
+      cv: "Create your first CV to see activity",
+      time: "Just now",
+      icon: Sparkles,
+      color: "text-indigo-400",
+      bg: "bg-indigo-500/20"
+    });
+  }
 
   if (loading) return <div className="p-6 text-white bg-[#0A0D14] min-h-screen">Loading...</div>;
 
@@ -59,10 +114,10 @@ export default function Dashboard() {
     <div className="flex h-screen overflow-hidden bg-[#0A0D14] text-white font-sans selection:bg-indigo-500/30">
       
       {/* SIDEBAR */}
-      <aside className="w-[260px] flex-shrink-0 border-r border-white/5 bg-[#0A0D14] flex flex-col justify-between overflow-y-auto custom-scrollbar">
+      <aside className="hidden md:flex w-[230px] flex-shrink-0 border-r border-white/5 bg-[#0A0D14] flex-col justify-between overflow-y-auto custom-scrollbar">
         <div>
           {/* Logo */}
-          <div className="flex items-center gap-3 p-6 pb-4">
+          <div className="flex items-center gap-2 p-4 pb-2">
             <div className="bg-white/10 p-1.5 rounded-lg">
               <FileCheck className="w-5 h-5 text-white" />
             </div>
@@ -71,33 +126,34 @@ export default function Dashboard() {
           </div>
 
           {/* Profile */}
-          <div className="px-4 mb-6">
-            <div className="flex items-center gap-3 bg-[#111622] p-3 rounded-2xl border border-white/5">
-              <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center overflow-hidden flex-shrink-0">
-                <img src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Nethma"} alt="User" className="w-full h-full object-cover" />
+          <div className="px-3 mb-4 cursor-pointer" onClick={() => navigate('/profile')}>
+            <div className="flex items-center gap-2 bg-[#111622] p-2 rounded-xl border border-white/5 hover:bg-white/5 transition-colors">
+
+              <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <img src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.displayName || 'User'}`} alt="User" className="w-full h-full object-cover" />
               </div>
               <div className="overflow-hidden">
-                <div className="text-sm font-semibold truncate text-gray-200">{userFullName}</div>
-                <div className="text-xs text-gray-500 truncate">{userEmail}</div>
+                <div className="text-xs font-semibold truncate text-gray-200">{userFullName}</div>
+                <div className="text-[10px] text-gray-500 truncate">{userEmail}</div>
               </div>
             </div>
           </div>
 
-          <div className="px-4 space-y-6">
+          <div className="px-3 space-y-4">
             {/* MAIN */}
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Main</div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Main</div>
               <div className="space-y-1">
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium transition-colors">
+                <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium shadow-lg shadow-indigo-500/20 transition-colors">
                   <LayoutDashboard className="w-4 h-4" /> Dashboard
                 </button>
-                <button onClick={() => navigate('/my-cvs')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/my-cvs')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <FileText className="w-4 h-4" /> My CVs
                 </button>
-                <button onClick={() => navigate('/builder')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/builder')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <PlusSquare className="w-4 h-4" /> Create New CV
                 </button>
-                <button onClick={() => navigate('/templates')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/templates')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <LayoutTemplate className="w-4 h-4" /> Templates
                 </button>
               </div>
@@ -105,23 +161,21 @@ export default function Dashboard() {
 
             {/* AI TOOLS */}
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">AI Tools</div>
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">AI Tools</div>
               <div className="space-y-1">
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/ai-writer')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <PenTool className="w-4 h-4" /> AI Writer
-                  <span className="ml-auto text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/ats-analyzer')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <FileCheck className="w-4 h-4" /> ATS Analyzer
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/job-match')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <Sparkles className="w-4 h-4" /> Job Match
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/interview-questions')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <MessageSquare className="w-4 h-4" /> Interview Questions
-                  <span className="ml-auto text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <button onClick={() => navigate('/cover-letter-generator')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                   <FileSignature className="w-4 h-4" /> Cover Letter Generator
                 </button>
               </div>
@@ -129,19 +183,20 @@ export default function Dashboard() {
 
             {/* ANALYTICS */}
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Analytics</div>
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Analytics</div>
+              <button onClick={() => navigate('/insights')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                 <BarChart2 className="w-4 h-4" /> Insights & Analytics
               </button>
             </div>
 
             {/* MANAGE */}
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Manage</div>
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+              <div className="text-[9px] font-bold text-gray-500 mb-1.5 px-2 uppercase tracking-wider">Manage</div>
+              <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                 <User className="w-4 h-4" /> My Profile
               </button>
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+
+              <button onClick={() => navigate('/settings')} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-xs font-medium transition-colors">
                 <Settings className="w-4 h-4" /> Settings
               </button>
             </div>
@@ -149,13 +204,24 @@ export default function Dashboard() {
         </div>
 
         {/* Bottom Theme Toggle */}
-        <div className="p-4 mt-6">
-          <div className="flex items-center justify-center gap-4 bg-[#111622] p-2 rounded-2xl border border-white/5">
-            <button className="text-gray-400 hover:text-white"><Sun className="w-4 h-4" /></button>
-            <div className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer">
-              <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+        <div className="p-3 mt-4">
+          <div className="flex items-center justify-center gap-4 bg-[#111622] p-2 rounded-2xl border border-white/5 theme-sidebar-toggle">
+            <button onClick={() => setTheme("light")} className={`${theme === 'light' ? 'text-white' : 'text-gray-400'} hover:text-white transition-colors`} title="Light theme">
+              <Sun className="w-4 h-4" />
+            </button>
+            <div
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer"
+            >
+              <motion.div
+                animate={{ x: theme === 'dark' ? 22 : 4 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="absolute top-1 w-3 h-3 bg-white rounded-full"
+              />
             </div>
-            <button className="text-white"><Moon className="w-4 h-4" /></button>
+            <button onClick={() => setTheme("dark")} className={`${theme === 'dark' ? 'text-white' : 'text-gray-400'} hover:text-white transition-colors`} title="Dark theme">
+              <Moon className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>
@@ -163,28 +229,23 @@ export default function Dashboard() {
       {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto bg-[#0A0D14] custom-scrollbar p-8">
         {/* HEADER */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}! 👋</h1>
             <p className="text-gray-400 text-sm">Here's what's happening with your CVs today.</p>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
             <button onClick={() => navigate('/builder')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors text-sm">
               <PlusSquare className="w-4 h-4" /> Create New CV
             </button>
-            <button className="relative p-2.5 rounded-full bg-[#111622] border border-white/5 text-gray-300 hover:text-white transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 rounded-full text-[10px] flex items-center justify-center border-2 border-[#0A0D14] font-bold">3</span>
-            </button>
-            <div className="flex items-center gap-2 cursor-pointer">
-              <img src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Nethma"} alt="User" className="w-10 h-10 rounded-full border border-white/10" />
-              <ChevronDown className="w-4 h-4 text-gray-400" />
-            </div>
+            <NotificationDropdown />
+            <ProfileDropdown />
+
           </div>
         </div>
 
         {/* STATS CARDS */}
-        <div className="grid grid-cols-4 gap-5 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-indigo-500/20 p-2.5 rounded-xl text-indigo-400">
@@ -192,9 +253,9 @@ export default function Dashboard() {
               </div>
               <div className="text-sm font-semibold text-gray-300">Total CVs</div>
             </div>
-            <div className="text-3xl font-bold mb-2">8</div>
+            <div className="text-3xl font-bold mb-2">{totalCvs}</div>
             <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> 2 from last month
+              <ArrowUpRight className="w-3 h-3" /> Total created
             </div>
           </div>
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
@@ -204,9 +265,9 @@ export default function Dashboard() {
               </div>
               <div className="text-sm font-semibold text-gray-300">Profile Views</div>
             </div>
-            <div className="text-3xl font-bold mb-2">1,248</div>
+            <div className="text-3xl font-bold mb-2">{totalViews.toLocaleString()}</div>
             <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> 18.5% from last month
+              <ArrowUpRight className="w-3 h-3" /> Across all CVs
             </div>
           </div>
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
@@ -216,9 +277,9 @@ export default function Dashboard() {
               </div>
               <div className="text-sm font-semibold text-gray-300">Downloads</div>
             </div>
-            <div className="text-3xl font-bold mb-2">356</div>
+            <div className="text-3xl font-bold mb-2">{totalDownloads.toLocaleString()}</div>
             <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> 12.7% from last month
+              <ArrowUpRight className="w-3 h-3" /> Across all CVs
             </div>
           </div>
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
@@ -228,15 +289,15 @@ export default function Dashboard() {
               </div>
               <div className="text-sm font-semibold text-gray-300">QR Scans</div>
             </div>
-            <div className="text-3xl font-bold mb-2">89</div>
+            <div className="text-3xl font-bold mb-2">{totalQrScans.toLocaleString()}</div>
             <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> 8.3% from last month
+              <ArrowUpRight className="w-3 h-3" /> Across all CVs
             </div>
           </div>
         </div>
 
         {/* MIDDLE ROW */}
-        <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* GRAPH */}
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-6 relative">
             <div className="flex items-center justify-between mb-8">
@@ -298,40 +359,38 @@ export default function Dashboard() {
               <button onClick={() => navigate('/builder')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
                 <FilePlus className="w-4 h-4 text-indigo-400" /> Create New CV
               </button>
-              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
+              <button onClick={() => navigate('/ai-writer')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
                 <PenTool className="w-4 h-4 text-gray-400" /> AI Writer
-                <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold shadow-lg">New</span>
               </button>
-              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+              <button onClick={() => navigate('/ats-analyzer')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
                 <FileCheck className="w-4 h-4 text-blue-400" /> ATS Analyzer
               </button>
-              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+              <button onClick={() => navigate('/job-match')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
                 <Sparkles className="w-4 h-4 text-emerald-400" /> Job Match
               </button>
-              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
+              <button onClick={() => navigate('/interview-questions')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
                 <MessageSquare className="w-4 h-4 text-orange-400" /> Interview Questions
-                <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold shadow-lg">New</span>
               </button>
-              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+              <button onClick={() => navigate('/cover-letter-generator')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
                 <FileSignature className="w-4 h-4 text-gray-400" /> Cover Letter Generator
               </button>
             </div>
-            <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors text-sm font-semibold border border-indigo-500/20 mt-auto">
+            <button onClick={() => navigate('/my-cvs')} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors text-sm font-semibold border border-indigo-500/20 mt-auto">
               <Share2 className="w-4 h-4" /> Share My CV
             </button>
           </div>
         </div>
 
         {/* BOTTOM ROW */}
-        <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* RECENT CVS */}
           <div className="bg-[#111622] border border-white/5 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold">Recent CVs</h2>
-              <button className="text-xs font-semibold text-gray-300 hover:text-white bg-[#1e2336] px-4 py-2 rounded-xl border border-white/5 transition-colors">View All</button>
+              <button onClick={() => navigate('/my-cvs')} className="text-xs font-semibold text-gray-300 hover:text-white bg-[#1e2336] px-4 py-2 rounded-xl border border-white/5 transition-colors">View All</button>
             </div>
             <div className="space-y-2">
-              {displayCvs.map(cv => (
+              {displayCvs.length > 0 ? displayCvs.map(cv => (
                 <div key={cv.id} className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-16 bg-white rounded-md flex-shrink-0 border border-gray-200 overflow-hidden relative shadow-sm">
@@ -381,7 +440,14 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center p-8 border border-white/5 rounded-xl bg-white/[0.02]">
+                  <p className="text-sm text-gray-400 mb-3">No CVs created yet.</p>
+                  <button onClick={() => navigate('/builder')} className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                    Create New CV
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -408,8 +474,8 @@ export default function Dashboard() {
         </div>
 
         {/* PRO TIP BANNER */}
-        <div className="bg-[#111622] border border-indigo-500/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(79,70,229,0.05)] mb-8">
-          <div className="flex items-center gap-3">
+        <div className="bg-[#111622] border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(79,70,229,0.05)] mb-8">
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
             <div className="bg-indigo-500/20 p-2.5 rounded-xl text-indigo-400">
               <Lightbulb className="w-5 h-5" />
             </div>

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "j1",
+    "title": "Frontend Developer",
+    "company": "Tech Solutions Inc.",
+    "location": "Remote",
+    "type": "Full Time",
+    "experience": "Junior/Mid-Level",
+    "skills": ["React", "JavaScript", "HTML", "CSS", "Tailwind CSS", "TypeScript"],
+    "description": "We are looking for a Frontend Developer to join our team. You will be responsible for building responsive and interactive web applications using React and Tailwind CSS."
+  },
+  {
+    "id": "j2",
+    "title": "React Developer",
+    "company": "CodeCraft Studios",
+    "location": "Colombo, Sri Lanka",
+    "type": "Full Time",
+    "experience": "Mid-Level",
+    "skills": ["React", "JavaScript", "Redux", "REST APIs", "Jest"],
+    "description": "Join our studio to build cutting-edge web experiences. Strong proficiency in React and state management with Redux is required."
+  },
+  {
+    "id": "j3",
+    "title": "UI Developer",
+    "company": "Digital Innovation Ltd.",
+    "location": "Hybrid",
+    "type": "Full Time",
+    "experience": "Junior",
+    "skills": ["HTML", "CSS", "JavaScript", "Bootstrap", "Figma"],
+    "description": "Transform designs into high-quality code. Experience with UI frameworks and design tools is a plus."
+  },
+  {
+    "id": "j4",
+    "title": "Web Developer",
+    "company": "Creative Web Agency",
+    "location": "Colombo, Sri Lanka",
+    "type": "Full Time",
+    "experience": "Mid-Level",
+    "skills": ["PHP", "MySQL", "JavaScript", "jQuery", "Wordpress"],
+    "description": "Manage and develop web applications for various clients. Proficiency in PHP and MySQL is essential."
+  },
+  {
+    "id": "j5",
+    "title": "Senior Frontend Engineer",
+    "company": "Global Tech Corp",
+    "location": "Worldwide (Remote)",
+    "type": "Full Time",
+    "experience": "Senior",
+    "skills": ["React", "Next.js", "TypeScript", "AWS", "Docker"],
+    "description": "Lead the frontend development of our global platform. Experience with Next.js and cloud services is required."
+  },
+  {
+    "id": "j6",
+    "title": "Junior Software Engineer",
+    "company": "StartUp Hub",
+    "location": "Colombo, Sri Lanka",
+    "type": "Full Time",
+    "experience": "Entry Level",
+    "skills": ["Python", "JavaScript", "SQL", "Git"],
+    "description": "Great opportunity for fresh graduates to start their career. We value passion for learning and problem-solving."
+  },
+  {
+    "id": "j7",
+    "title": "Full Stack Developer",
+    "company": "InnoSys",
+    "location": "Remote",
+    "type": "Contract",
+    "experience": "Mid-Level",
+    "skills": ["Node.js", "React", "MongoDB", "Express"],
+    "description": "Build end-to-end features for our SaaS product. Experience with the MERN stack is preferred."
+  },
+  {
+    "id": "j8",
+    "title": "Mobile App Developer",
+    "company": "Appify",
+    "location": "On-site",
+    "type": "Full Time",
+    "experience": "Mid-Level",
+    "skills": ["React Native", "JavaScript", "Firebase", "iOS/Android"],
+    "description": "Develop cross-platform mobile applications using React Native."
+  }
+]

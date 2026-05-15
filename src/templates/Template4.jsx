@@ -64,7 +64,7 @@ export default function Template4({ cv }) {
   const lightBg = "#f8fafc";
 
   return (
-    <div style={{ backgroundColor: bg, minHeight: "980px", overflow: "hidden" }}>
+    <div style={{ backgroundColor: bg, minHeight: "100%" }}>
       {/* ═══════════════ HEADER ═══════════════ */}
       <div
         style={{
@@ -419,6 +419,98 @@ export default function Template4({ cv }) {
           </Section>
         </div>
 
+        {/* ── EDUCATION ── */}
+        {education.length > 0 && (
+          <div style={{ marginTop: "24px" }}>
+            <Section title="EDUCATION" accent={acc} pri={pri}>
+              <div>
+                {education.map((item, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      paddingBottom: i !== education.length - 1 ? "14px" : "0",
+                      marginBottom: i !== education.length - 1 ? "14px" : "0",
+                      borderBottom:
+                        i !== education.length - 1
+                          ? `1px solid ${sec}15`
+                          : "none",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: pri }}>
+                        {item.degree || "Degree"}
+                      </div>
+                      {item.university && (
+                        <div
+                          style={{
+                            marginTop: "2px",
+                            fontSize: "11px",
+                            color: acc,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {item.university}
+                        </div>
+                      )}
+                      {item.details && (
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            fontSize: "11px",
+                            color: sec,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {item.details}
+                        </div>
+                      )}
+                    </div>
+                    {item.years && (
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          fontSize: "10px",
+                          color: sec,
+                          fontWeight: 600,
+                          marginTop: "2px",
+                        }}
+                      >
+                        {item.years}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {/* CUSTOM SECTIONS */}
+        {(cv.customSections ?? []).filter((s) => s.title?.trim() || s.content?.trim()).map((s, i) => (
+          <div key={i} style={{ marginTop: "32px" }}>
+            <Section title={(s.title || "Section").toUpperCase()} accent={acc} pri={pri}>
+              {s.content?.trim() && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "11px",
+                    lineHeight: 1.8,
+                    color: textCol,
+                    textAlign: "justify",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {s.content}
+                </p>
+              )}
+            </Section>
+          </div>
+        ))}
+
         {/* ── EXTRACURRICULAR ACTIVITIES ── */}
         {extracurricular.length > 0 && (
           <div style={{ marginTop: "24px" }}>
@@ -513,76 +605,6 @@ export default function Template4({ cv }) {
           </div>
         )}
 
-        {/* ── EDUCATION ── */}
-        {education.length > 0 && (
-          <div style={{ marginTop: "24px" }}>
-            <Section title="EDUCATION" accent={acc} pri={pri}>
-              <div>
-                {education.map((item, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: "12px",
-                      paddingBottom: i !== education.length - 1 ? "14px" : "0",
-                      marginBottom: i !== education.length - 1 ? "14px" : "0",
-                      borderBottom:
-                        i !== education.length - 1
-                          ? `1px solid ${sec}15`
-                          : "none",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: pri }}>
-                        {item.degree || "Degree"}
-                      </div>
-                      {item.university && (
-                        <div
-                          style={{
-                            marginTop: "2px",
-                            fontSize: "11px",
-                            color: acc,
-                            fontWeight: 500,
-                          }}
-                        >
-                          {item.university}
-                        </div>
-                      )}
-                      {item.details && (
-                        <div
-                          style={{
-                            marginTop: "4px",
-                            fontSize: "11px",
-                            color: sec,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {item.details}
-                        </div>
-                      )}
-                    </div>
-                    {item.years && (
-                      <span
-                        style={{
-                          flexShrink: 0,
-                          fontSize: "10px",
-                          color: sec,
-                          fontWeight: 600,
-                          marginTop: "2px",
-                        }}
-                      >
-                        {item.years}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          </div>
-        )}
-
         {/* ── REFERENCES ── */}
         {references.length > 0 && (
           <div style={{ marginTop: "24px" }}>
@@ -653,7 +675,7 @@ export default function Template4({ cv }) {
 /* ── Section wrapper ── */
 function Section({ title, accent, pri, children }) {
   return (
-    <div>
+    <section>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
         <div
           style={{
@@ -695,7 +717,7 @@ function Section({ title, accent, pri, children }) {
         />
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
