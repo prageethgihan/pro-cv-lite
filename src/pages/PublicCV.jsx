@@ -12,9 +12,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   limit,
   query,
   runTransaction,
+  setDoc,
   where,
 } from "firebase/firestore";
 
@@ -126,11 +128,20 @@ export default function PublicCV() {
         if (!viewCountedRef.current && user?.uid !== resolvedDoc.ownerId) {
           viewCountedRef.current = true;
           try {
+            // 1) Increment the total view count on the CV doc
             await runTransaction(db, async (tx) => {
               const fresh = await tx.get(ref);
               const cur = fresh.exists() ? Number(fresh.data().views || 0) : 0;
               tx.update(ref, { views: cur + 1 });
             });
+
+            // 2) Write a daily log so the dashboard chart has real data
+            const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            const ownerId = resolvedDoc.ownerId;
+            if (ownerId) {
+              const dayRef = doc(db, "viewLogs", ownerId, "days", today);
+              await setDoc(dayRef, { views: increment(1), date: today }, { merge: true });
+            }
           } catch (e) {
             console.warn("Views increment failed:", e);
           }

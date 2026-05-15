@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { useAuth } from "../auth/AuthProvider";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, getDocs } from "firebase/firestore";
 import { 
   LayoutDashboard, FileText, PlusSquare, LayoutTemplate, PenTool, 
   FileCheck, Sparkles, MessageSquare, FileSignature, BarChart2, 
@@ -14,12 +14,26 @@ import { motion } from "framer-motion";
 import ProfileDropdown from "../components/ProfileDropdown";
 import NotificationDropdown from "../components/NotificationDropdown";
 import { useThemeContext } from "../context/ThemeContext";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { theme, setTheme } = useThemeContext();
   const [cvs, setCvs] = useState([]);
+  const [viewLogData, setViewLogData] = useState([]);
+  const [chartPeriod, setChartPeriod] = useState("thisMonth"); // thisMonth | lastMonth | last7
+  const [chartLoading, setChartLoading] = useState(true);
+  const chartContainerRef = useRef(null);
+  const [chartMounted, setChartMounted] = useState(false);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -46,6 +60,72 @@ export default function Dashboard() {
       }
     };
   }, [user, loading]);
+
+  // Load real view log data from Firestore
+  useEffect(() => {
+    if (loading || !user) return;
+
+    const fetchViewLogs = async () => {
+      setChartLoading(true);
+      try {
+        const daysCol = collection(db, "viewLogs", user.uid, "days");
+        const snap = await getDocs(daysCol);
+        const map = {};
+        snap.forEach((d) => {
+          map[d.id] = d.data().views || 0;
+        });
+        setViewLogData(map);
+      } catch (e) {
+        console.warn("Failed to load viewLogs:", e);
+        setViewLogData({});
+      } finally {
+        setChartLoading(false);
+      }
+    };
+
+    fetchViewLogs();
+  }, [user, loading]);
+
+  // Mount chart after first paint to prevent Recharts negative-dimension errors
+  useEffect(() => {
+    const t = setTimeout(() => setChartMounted(true), 200);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Build chart data for the selected period
+  const buildChartData = () => {
+    const now = new Date();
+    let startDate, endDate;
+
+    if (chartPeriod === "last7") {
+      endDate = new Date(now);
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 6);
+    } else if (chartPeriod === "lastMonth") {
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else {
+      // thisMonth
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+
+    const days = [];
+    const cur = new Date(startDate);
+    while (cur <= endDate) {
+      const key = cur.toISOString().slice(0, 10);
+      const label = cur.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      days.push({ date: key, label, views: viewLogData[key] || 0 });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
+  };
+
+  const chartData = buildChartData();
+  const maxViews = Math.max(...chartData.map((d) => d.views), 10);
+  const chartPeriodLabel =
+    chartPeriod === "last7" ? "Last 7 Days" :
+    chartPeriod === "lastMonth" ? "Last Month" : "This Month";
 
   const userName = user?.displayName?.split(' ')[0] || "Nethma";
   const userFullName = user?.displayName || "Nethma Wanniarachchi";
@@ -109,6 +189,22 @@ export default function Dashboard() {
   }
 
   if (loading) return <div className="p-6 text-white bg-[#0A0D14] min-h-screen">Loading...</div>;
+
+  // Custom tooltip for chart
+  const ChartTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-[#1e2336] border border-white/10 px-3 py-2 rounded-lg text-xs shadow-xl text-center">
+          <div className="text-gray-400 mb-0.5">{payload[0]?.payload?.label}</div>
+          <div className="font-bold flex items-center justify-center gap-1.5 text-white">
+            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+            {payload[0]?.value?.toLocaleString()} Views
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A0D14] text-white font-sans selection:bg-indigo-500/30">
@@ -299,57 +395,77 @@ export default function Dashboard() {
         {/* MIDDLE ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* GRAPH */}
-          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6 relative">
-            <div className="flex items-center justify-between mb-8">
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6 relative min-w-0">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Profile Views Overview</h2>
-              <button className="flex items-center gap-2 text-sm text-gray-300 bg-[#1e2336] px-4 py-2 rounded-xl border border-white/5 font-medium">
-                This Month <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
-            {/* SVG Graph Mockup */}
-            <div className="h-56 w-full relative">
-              {/* Y Axis */}
-              <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[11px] text-gray-500 font-medium">
-                <span>400</span>
-                <span>300</span>
-                <span>200</span>
-                <span>100</span>
-                <span>0</span>
-              </div>
-              {/* Grid lines */}
-              <div className="absolute left-8 right-0 top-2 bottom-6 flex flex-col justify-between">
-                <div className="border-b border-white/5 w-full"></div>
-                <div className="border-b border-white/5 w-full"></div>
-                <div className="border-b border-white/5 w-full"></div>
-                <div className="border-b border-white/5 w-full"></div>
-                <div className="border-b border-white/5 w-full"></div>
-              </div>
-              {/* X Axis */}
-              <div className="absolute left-8 right-0 bottom-0 flex justify-between text-[11px] text-gray-500 font-medium px-2">
-                <span>May 1</span><span>May 5</span><span>May 10</span><span>May 15</span><span>May 20</span><span>May 25</span><span>May 30</span>
-              </div>
-              {/* Chart Line & Fill */}
-              <div className="absolute left-8 right-0 top-2 bottom-6">
-                <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 100 100">
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.4" />
-                      <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M0,75 L5,70 L10,55 L15,65 L20,50 L25,65 L30,55 L35,40 L40,35 L45,50 L50,60 L55,55 L60,25 L65,40 L70,10 L75,30 L80,45 L85,35 L90,40 L95,45 L100,40" fill="none" stroke="#6366f1" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                  <path d="M0,75 L5,70 L10,55 L15,65 L20,50 L25,65 L30,55 L35,40 L40,35 L45,50 L50,60 L55,55 L60,25 L65,40 L70,10 L75,30 L80,45 L85,35 L90,40 L95,45 L100,40 L100,100 L0,100 Z" fill="url(#chartGradient)" />
-                  <circle cx="45" cy="50" r="4" fill="#111622" stroke="#6366f1" strokeWidth="2" />
-                </svg>
-                {/* Tooltip mock */}
-                <div className="absolute left-[45%] top-[45%] -translate-x-1/2 -translate-y-full bg-[#1e2336] border border-white/10 px-3 py-1.5 rounded-lg text-xs shadow-xl text-center z-10 -mt-2">
-                  <div className="text-gray-400 mb-0.5">May 15</div>
-                  <div className="font-bold flex items-center justify-center gap-1.5 text-white">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div> 278 Views
-                  </div>
-                </div>
+              <div className="flex items-center gap-2">
+                {["thisMonth", "lastMonth", "last7"].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setChartPeriod(p)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors border ${
+                      chartPeriod === p
+                        ? "bg-indigo-600 text-white border-indigo-500"
+                        : "text-gray-400 bg-[#1e2336] border-white/5 hover:text-white"
+                    }`}
+                  >
+                    {p === "thisMonth" ? "This Month" : p === "lastMonth" ? "Last Month" : "Last 7 Days"}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {chartLoading ? (
+              <div className="h-56 flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600/30 border-t-indigo-600" />
+              </div>
+            ) : chartData.every((d) => d.views === 0) ? (
+              <div className="h-56 flex flex-col items-center justify-center gap-3 text-center">
+                <Eye className="w-8 h-8 text-gray-600" />
+                <p className="text-sm text-gray-400">No views recorded yet.</p>
+                <p className="text-xs text-gray-600">Share your CV link to start tracking.</p>
+              </div>
+            ) : chartMounted ? (
+              <div className="h-56 w-full min-w-0" ref={chartContainerRef}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+                    <defs>
+                      <linearGradient id="viewGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={chartPeriod === "last7" ? 0 : Math.floor(chartData.length / 6)}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      domain={[0, Math.ceil(maxViews * 1.2)]}
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(99,102,241,0.2)", strokeWidth: 1 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="views"
+                      stroke="#6366f1"
+                      strokeWidth={2.5}
+                      fill="url(#viewGradient)"
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 2, stroke: "#111622" }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-56" />
+            )}
           </div>
 
           {/* QUICK ACTIONS */}

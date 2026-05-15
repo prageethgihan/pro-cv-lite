@@ -9,7 +9,7 @@ import {
   FileCheck, Sparkles, MessageSquare, FileSignature, BarChart2, 
   User, Settings, Sun, Moon, Bell, ChevronDown, Search, Filter,
   LayoutGrid, List, Eye, Edit, MoreVertical, QrCode, Download,
-  Upload, Lightbulb, ChevronRight, ChevronLeft, Menu, Trash2, Copy, Share2
+  Lightbulb, ChevronRight, ChevronLeft, Menu, Trash2, Copy, Share2
 } from "lucide-react";
 import ProfileDropdown from "../components/ProfileDropdown";
 import NotificationDropdown from "../components/NotificationDropdown";
@@ -710,18 +710,7 @@ export default function MyCVs() {
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400" />
                 </button>
-                <button className="flex items-center justify-between p-3 rounded-xl bg-[#0A0D14] border border-white/5 hover:border-white/10 transition-colors group">
-                  <div className="flex items-center gap-3 text-sm text-gray-300 group-hover:text-white transition-colors">
-                    <Upload className="w-4 h-4 text-gray-400" /> Upload CV (PDF)
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400" />
-                </button>
-                <button className="flex items-center justify-between p-3 rounded-xl bg-[#0A0D14] border border-white/5 hover:border-white/10 transition-colors group">
-                  <div className="flex items-center gap-3 text-sm text-gray-300 group-hover:text-white transition-colors">
-                    <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg> Import from LinkedIn
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400" />
-                </button>
+
                 <button onClick={() => navigate('/templates')} className="flex items-center justify-between p-3 rounded-xl bg-[#0A0D14] border border-white/5 hover:border-white/10 transition-colors group">
                   <div className="flex items-center gap-3 text-sm text-gray-300 group-hover:text-white transition-colors">
                     <LayoutTemplate className="w-4 h-4 text-gray-400" /> View Templates
