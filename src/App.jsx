@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import MyCVs from "./pages/MyCVs";
+import Templates from "./pages/Templates";
 import Builder from "./pages/Builder";
 import PublicCV from "./pages/PublicCV";
 
@@ -69,6 +71,24 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/my-cvs"
+          element={
+            <ProtectedRoute>
+              <MyCVs />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <Templates />
             </ProtectedRoute>
           }
         />

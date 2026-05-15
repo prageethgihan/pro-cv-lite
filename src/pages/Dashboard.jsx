@@ -1,622 +1,444 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { db, auth } from "../firebase";
 import { useAuth } from "../auth/AuthProvider";
-
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-
-import { signOut } from "firebase/auth";
-import { QRCodeCanvas } from "qrcode.react";
-
-function slugify(text) {
-  return (text || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-}
-
-function makePublishedSlug(base, docId) {
-  const cleanBase = slugify(base || "my-cv");
-  const shortId = (docId || "").slice(0, 6).toLowerCase();
-  return shortId ? `${cleanBase}-${shortId}` : cleanBase;
-}
+import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { 
+  LayoutDashboard, FileText, PlusSquare, LayoutTemplate, PenTool, 
+  FileCheck, Sparkles, MessageSquare, FileSignature, BarChart2, 
+  User, Settings, Sun, Moon, Bell, ChevronDown, ArrowUpRight, 
+  QrCode, Download, Eye, FilePlus, Share2, MoreVertical, 
+  Lightbulb, ArrowRight, Menu 
+} from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-
   const [cvs, setCvs] = useState([]);
-  const [search, setSearch] = useState("");
-
-  const [shareOpen, setShareOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
-  const [shareTitle, setShareTitle] = useState("");
-
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [publishCv, setPublishCv] = useState(null);
-  const [slugInput, setSlugInput] = useState("");
-  const [slugError, setSlugError] = useState("");
-  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) return;
-
-    const q = query(
-      collection(db, "cvs"),
-      where("ownerId", "==", user.uid),
-      orderBy("updatedAt", "desc")
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setCvs(list);
-      },
-      (err) => {
-        console.error("Dashboard snapshot error:", err);
-        alert("Firestore error. Check console.");
-      }
-    );
-
+    if (loading || !user) return;
+    const q = query(collection(db, "cvs"), where("ownerId", "==", user.uid), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setCvs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
     return () => unsub();
   }, [user, loading]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return cvs;
+  const userName = user?.displayName?.split(' ')[0] || "Nethma";
+  const userFullName = user?.displayName || "Nethma Wanniarachchi";
+  const userEmail = user?.email || "nethma@example.com";
+  
+  const mockCvs = [
+    { id: 1, title: "Software Engineer CV", date: "Updated May 30, 2025", status: "Published", views: 342, downloads: 128 },
+    { id: 2, title: "Product Manager CV", date: "Updated May 28, 2025", status: "Published", views: 276, downloads: 97 },
+    { id: 3, title: "UX Designer CV", date: "Updated May 25, 2025", status: "Draft", views: 124, downloads: 32 },
+    { id: 4, title: "Data Analyst CV", date: "Updated May 20, 2025", status: "Published", views: 198, downloads: 68 },
+  ];
 
-    return cvs.filter((cv) => {
-      const title = (cv.title || "").toLowerCase();
-      const template = (cv.templateId || cv.template || "").toLowerCase();
-      const name =
-        (cv.cv?.fullName || cv.data?.fullName || cv.fullName || "").toLowerCase();
+  const displayCvs = cvs.length >= 4 ? cvs.map((c) => ({
+    id: c.id,
+    title: c.title || "Untitled CV",
+    date: `Updated ${new Date(c.updatedAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`,
+    status: c.isPublished ? "Published" : "Draft",
+    views: c.views || 0,
+    downloads: c.downloads || 0
+  })).slice(0, 4) : mockCvs;
 
-      return title.includes(q) || template.includes(q) || name.includes(q);
-    });
-  }, [cvs, search]);
+  const recentActivity = [
+    { id: 1, action: "Someone viewed your", cv: "Software Engineer CV", time: "2 minutes ago", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20" },
+    { id: 2, action: "Your CV was downloaded", cv: "Product Manager CV", time: "15 minutes ago", icon: Download, color: "text-emerald-400", bg: "bg-emerald-500/20" },
+    { id: 3, action: "QR code scanned", cv: "Software Engineer CV", time: "1 hour ago", icon: QrCode, color: "text-yellow-400", bg: "bg-yellow-500/20" },
+    { id: 4, action: "Someone viewed your", cv: "UX Designer CV", time: "2 hours ago", icon: Eye, color: "text-purple-400", bg: "bg-purple-500/20" },
+    { id: 5, action: "Your CV was downloaded", cv: "Data Analyst CV", time: "3 hours ago", icon: Download, color: "text-emerald-400", bg: "bg-emerald-500/20" },
+  ];
 
-  const getCvTitle = (cv) => {
-    return (
-      cv.title ||
-      cv.cv?.fullName ||
-      cv.data?.fullName ||
-      cv.fullName ||
-      "Untitled CV"
-    );
-  };
-
-  const getLegacyPublicUrl = (cvId) => `${window.location.origin}/cv/${cvId}`;
-  const getPublishedUrl = (slug) => `${window.location.origin}/p/${slug}`;
-
-  const getBestShareUrl = (cv) => {
-    if (cv.isPublished && cv.publishedSlug) {
-      return getPublishedUrl(cv.publishedSlug);
-    }
-    return getLegacyPublicUrl(cv.id);
-  };
-
-  const handleDelete = async (cvId, title) => {
-    const ok = confirm(`Delete "${title || "Untitled CV"}" ?`);
-    if (!ok) return;
-
-    try {
-      await deleteDoc(doc(db, "cvs", cvId));
-    } catch (e) {
-      console.error(e);
-      alert("❌ Delete failed. Check console.");
-    }
-  };
-
-  const handleDuplicate = async (cvDoc) => {
-    if (!user) return;
-
-    try {
-      const baseTitle = getCvTitle(cvDoc);
-      const newTitle = `${baseTitle} (Copy)`;
-
-      const payload = {
-        ownerId: user.uid,
-        title: newTitle,
-        cv: cvDoc.cv ||
-          cvDoc.data || {
-            fullName: "",
-            jobTitle: "",
-            summary: "",
-            photoDataUrl: "",
-            photoDataUrlHd: "",
-            themeAutoGenerated: null,
-            themeMode: "auto",
-            themeManual: null,
-            skills: [""],
-            experience: [
-              { role: "", company: "", start: "", end: "", description: "" },
-            ],
-          },
-        templateId: cvDoc.templateId || cvDoc.template || "t1",
-        isPublic: false,
-        isPublished: false,
-        publishedSlug: "",
-        publishedAt: null,
-        views: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      const docRef = await addDoc(collection(db, "cvs"), payload);
-      const openNow = confirm("✅ Duplicated! Open the copy now?");
-      if (openNow) navigate(`/builder/${docRef.id}`);
-    } catch (e) {
-      console.error(e);
-      alert("❌ Duplicate failed. Check console.");
-    }
-  };
-
-  const openShare = async (cv) => {
-    if (!cv.isPublic) {
-      alert("This CV is Private. Open it in Builder and enable Public Share first.");
-      return;
-    }
-
-    const url = getBestShareUrl(cv);
-    setShareUrl(url);
-    setShareTitle(getCvTitle(cv));
-    setShareOpen(true);
-
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // ignore
-    }
-  };
-
-  const closeShare = () => {
-    setShareOpen(false);
-    setShareUrl("");
-    setShareTitle("");
-  };
-
-  const copyShare = async (value) => {
-    try {
-      const text = typeof value === "string" ? value : shareUrl;
-      await navigator.clipboard.writeText(text);
-      alert("✅ Link copied!");
-    } catch (e) {
-      console.error(e);
-      alert("❌ Copy failed. You can manually copy the link.");
-    }
-  };
-
-  const openPublishModal = (cv) => {
-    const base =
-      cv.publishedSlug ||
-      slugify(cv.cv?.fullName || cv.title || cv.fullName || "my-cv");
-
-    const cleanBase = base.replace(/-[a-z0-9]{6}$/, "");
-
-    setPublishCv(cv);
-    setSlugInput(cleanBase);
-    setSlugError("");
-    setPublishOpen(true);
-  };
-
-  const closePublishModal = () => {
-    if (publishing) return;
-    setPublishOpen(false);
-    setPublishCv(null);
-    setSlugInput("");
-    setSlugError("");
-  };
-
-  const validateSlug = (slug) => {
-    if (!slug) return "Slug is required.";
-    if (slug.length < 3) return "Slug must be at least 3 characters.";
-    if (slug.length > 50) return "Slug must be 50 characters or less.";
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-      return "Use only lowercase letters, numbers, and hyphens.";
-    }
-    return "";
-  };
-
-  const handlePublish = async () => {
-    if (!publishCv) return;
-
-    const cleanBase = slugify(slugInput);
-    setSlugInput(cleanBase);
-
-    const validationError = validateSlug(cleanBase);
-    if (validationError) {
-      setSlugError(validationError);
-      return;
-    }
-
-    try {
-      setPublishing(true);
-      setSlugError("");
-
-      const finalSlug = makePublishedSlug(cleanBase, publishCv.id);
-
-      await updateDoc(doc(db, "cvs", publishCv.id), {
-        isPublic: true,
-        isPublished: true,
-        publishedSlug: finalSlug,
-        publishedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      const publishedUrl = getPublishedUrl(finalSlug);
-
-      setPublishOpen(false);
-      setPublishCv(null);
-      setSlugInput("");
-      setSlugError("");
-
-      try {
-        await navigator.clipboard.writeText(publishedUrl);
-      } catch {
-        // ignore
-      }
-
-      alert("✅ CV published!");
-    } catch (e) {
-      console.error(e);
-      setSlugError("Publish failed. Check console.");
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const handleUnpublish = async (cv) => {
-    const ok = confirm(`Unpublish "${getCvTitle(cv)}" ?`);
-    if (!ok) return;
-
-    try {
-      await updateDoc(doc(db, "cvs", cv.id), {
-        isPublished: false,
-        publishedSlug: "",
-        publishedAt: null,
-        updatedAt: serverTimestamp(),
-      });
-      alert("✅ CV unpublished.");
-    } catch (e) {
-      console.error(e);
-      alert("❌ Unpublish failed. Check console.");
-    }
-  };
-
-  if (loading) {
-    return <div className="p-6">Loading...</div>;
-  }
+  if (loading) return <div className="p-6 text-white bg-[#0A0D14] min-h-screen">Loading...</div>;
 
   return (
-    <div className="min-h-screen text-white bg-transparent relative z-0">
-      <header className="border-b border-white/10 glass-panel">
-        <div className="mx-auto max-w-5xl p-4">
-          <div className="flex items-center justify-between">
+    <div className="flex h-screen overflow-hidden bg-[#0A0D14] text-white font-sans selection:bg-indigo-500/30">
+      
+      {/* SIDEBAR */}
+      <aside className="w-[260px] flex-shrink-0 border-r border-white/5 bg-[#0A0D14] flex flex-col justify-between overflow-y-auto custom-scrollbar">
+        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-3 p-6 pb-4">
+            <div className="bg-white/10 p-1.5 rounded-lg">
+              <FileCheck className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold tracking-tight">ProCV Lite</span>
+            <Menu className="w-5 h-5 ml-auto text-gray-400 cursor-pointer hover:text-white" />
+          </div>
+
+          {/* Profile */}
+          <div className="px-4 mb-6">
+            <div className="flex items-center gap-3 bg-[#111622] p-3 rounded-2xl border border-white/5">
+              <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <img src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Nethma"} alt="User" className="w-full h-full object-cover" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="text-sm font-semibold truncate text-gray-200">{userFullName}</div>
+                <div className="text-xs text-gray-500 truncate">{userEmail}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 space-y-6">
+            {/* MAIN */}
             <div>
-              <div className="text-xl font-bold">Dashboard</div>
-              <p className="text-sm text-gray-300">Your saved CVs</p>
-              <p className="mt-1 text-xs text-gray-400">
-                user: {user?.email || user?.uid}
-              </p>
+              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Main</div>
+              <div className="space-y-1">
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium transition-colors">
+                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                </button>
+                <button onClick={() => navigate('/my-cvs')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <FileText className="w-4 h-4" /> My CVs
+                </button>
+                <button onClick={() => navigate('/builder')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <PlusSquare className="w-4 h-4" /> Create New CV
+                </button>
+                <button onClick={() => navigate('/templates')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <LayoutTemplate className="w-4 h-4" /> Templates
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate("/builder")}
-                className="rounded-xl glass-primary-button px-4 py-2 text-sm"
-              >
-                + New CV
-              </button>
+            {/* AI TOOLS */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">AI Tools</div>
+              <div className="space-y-1">
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <PenTool className="w-4 h-4" /> AI Writer
+                  <span className="ml-auto text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
+                </button>
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <FileCheck className="w-4 h-4" /> ATS Analyzer
+                </button>
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <Sparkles className="w-4 h-4" /> Job Match
+                </button>
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <MessageSquare className="w-4 h-4" /> Interview Questions
+                  <span className="ml-auto text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
+                </button>
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                  <FileSignature className="w-4 h-4" /> Cover Letter Generator
+                </button>
+              </div>
+            </div>
 
-              <button
-                onClick={() => signOut(auth)}
-                className="rounded-xl glass-button px-4 py-2 text-sm"
-              >
-                Logout
+            {/* ANALYTICS */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Analytics</div>
+              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <BarChart2 className="w-4 h-4" /> Insights & Analytics
               </button>
             </div>
-          </div>
 
-          <div className="mt-4">
-            <input
-              className="w-full rounded-2xl glass-input px-4 py-3"
-              placeholder="Search by title, name, or template..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <div className="mt-2 text-xs text-gray-400">
-              Showing {filtered.length} of {cvs.length}
+            {/* MANAGE */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-500 mb-2 px-2 uppercase tracking-wider">Manage</div>
+              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <User className="w-4 h-4" /> My Profile
+              </button>
+              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors">
+                <Settings className="w-4 h-4" /> Settings
+              </button>
             </div>
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-5xl p-4">
-        {filtered.length === 0 ? (
-          <div className="rounded-2xl glass-panel p-6 text-center text-gray-400">
-            No CVs found{search.trim() ? " for your search." : " yet."}
+        {/* Bottom Theme Toggle */}
+        <div className="p-4 mt-6">
+          <div className="flex items-center justify-center gap-4 bg-[#111622] p-2 rounded-2xl border border-white/5">
+            <button className="text-gray-400 hover:text-white"><Sun className="w-4 h-4" /></button>
+            <div className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer">
+              <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+            </div>
+            <button className="text-white"><Moon className="w-4 h-4" /></button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((cv) => {
-              const title = getCvTitle(cv);
-              const template = cv.templateId || cv.template || "t1";
-              const legacyUrl = getLegacyPublicUrl(cv.id);
-              const publishedUrl =
-                cv.isPublished && cv.publishedSlug
-                  ? getPublishedUrl(cv.publishedSlug)
-                  : "";
+        </div>
+      </aside>
 
-              return (
-                <div
-                  key={cv.id}
-                  className="flex flex-col gap-3 rounded-2xl glass-panel p-4 sm:flex-row sm:items-center sm:justify-between transition-all duration-300 hover:bg-white/5"
-                >
-                  <div className="min-w-0">
-                    <div className="font-semibold">{title}</div>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 overflow-y-auto bg-[#0A0D14] custom-scrollbar p-8">
+        {/* HEADER */}
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}! 👋</h1>
+            <p className="text-gray-400 text-sm">Here's what's happening with your CVs today.</p>
+          </div>
+          <div className="flex items-center gap-5">
+            <button onClick={() => navigate('/builder')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors text-sm">
+              <PlusSquare className="w-4 h-4" /> Create New CV
+            </button>
+            <button className="relative p-2.5 rounded-full bg-[#111622] border border-white/5 text-gray-300 hover:text-white transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 rounded-full text-[10px] flex items-center justify-center border-2 border-[#0A0D14] font-bold">3</span>
+            </button>
+            <div className="flex items-center gap-2 cursor-pointer">
+              <img src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Nethma"} alt="User" className="w-10 h-10 rounded-full border border-white/10" />
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            </div>
+          </div>
+        </div>
 
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      {cv.isPublished ? (
-                        <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                          Published
-                        </span>
-                      ) : cv.isPublic ? (
-                        <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                          Public
-                        </span>
-                      ) : (
-                        <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          Private
-                        </span>
-                      )}
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-4 gap-5 mb-6">
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-indigo-500/20 p-2.5 rounded-xl text-indigo-400">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-semibold text-gray-300">Total CVs</div>
+            </div>
+            <div className="text-3xl font-bold mb-2">8</div>
+            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+              <ArrowUpRight className="w-3 h-3" /> 2 from last month
+            </div>
+          </div>
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-blue-500/20 p-2.5 rounded-xl text-blue-400">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-semibold text-gray-300">Profile Views</div>
+            </div>
+            <div className="text-3xl font-bold mb-2">1,248</div>
+            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+              <ArrowUpRight className="w-3 h-3" /> 18.5% from last month
+            </div>
+          </div>
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-emerald-500/20 p-2.5 rounded-xl text-emerald-400">
+                <Download className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-semibold text-gray-300">Downloads</div>
+            </div>
+            <div className="text-3xl font-bold mb-2">356</div>
+            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+              <ArrowUpRight className="w-3 h-3" /> 12.7% from last month
+            </div>
+          </div>
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-yellow-500/20 p-2.5 rounded-xl text-yellow-400">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-semibold text-gray-300">QR Scans</div>
+            </div>
+            <div className="text-3xl font-bold mb-2">89</div>
+            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+              <ArrowUpRight className="w-3 h-3" /> 8.3% from last month
+            </div>
+          </div>
+        </div>
 
-                      <span className="text-xs text-gray-500">
-                        Template: {template}
-                      </span>
+        {/* MIDDLE ROW */}
+        <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
+          {/* GRAPH */}
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6 relative">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-lg font-semibold">Profile Views Overview</h2>
+              <button className="flex items-center gap-2 text-sm text-gray-300 bg-[#1e2336] px-4 py-2 rounded-xl border border-white/5 font-medium">
+                This Month <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+            {/* SVG Graph Mockup */}
+            <div className="h-56 w-full relative">
+              {/* Y Axis */}
+              <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[11px] text-gray-500 font-medium">
+                <span>400</span>
+                <span>300</span>
+                <span>200</span>
+                <span>100</span>
+                <span>0</span>
+              </div>
+              {/* Grid lines */}
+              <div className="absolute left-8 right-0 top-2 bottom-6 flex flex-col justify-between">
+                <div className="border-b border-white/5 w-full"></div>
+                <div className="border-b border-white/5 w-full"></div>
+                <div className="border-b border-white/5 w-full"></div>
+                <div className="border-b border-white/5 w-full"></div>
+                <div className="border-b border-white/5 w-full"></div>
+              </div>
+              {/* X Axis */}
+              <div className="absolute left-8 right-0 bottom-0 flex justify-between text-[11px] text-gray-500 font-medium px-2">
+                <span>May 1</span><span>May 5</span><span>May 10</span><span>May 15</span><span>May 20</span><span>May 25</span><span>May 30</span>
+              </div>
+              {/* Chart Line & Fill */}
+              <div className="absolute left-8 right-0 top-2 bottom-6">
+                <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 100 100">
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M0,75 L5,70 L10,55 L15,65 L20,50 L25,65 L30,55 L35,40 L40,35 L45,50 L50,60 L55,55 L60,25 L65,40 L70,10 L75,30 L80,45 L85,35 L90,40 L95,45 L100,40" fill="none" stroke="#6366f1" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                  <path d="M0,75 L5,70 L10,55 L15,65 L20,50 L25,65 L30,55 L35,40 L40,35 L45,50 L50,60 L55,55 L60,25 L65,40 L70,10 L75,30 L80,45 L85,35 L90,40 L95,45 L100,40 L100,100 L0,100 Z" fill="url(#chartGradient)" />
+                  <circle cx="45" cy="50" r="4" fill="#111622" stroke="#6366f1" strokeWidth="2" />
+                </svg>
+                {/* Tooltip mock */}
+                <div className="absolute left-[45%] top-[45%] -translate-x-1/2 -translate-y-full bg-[#1e2336] border border-white/10 px-3 py-1.5 rounded-lg text-xs shadow-xl text-center z-10 -mt-2">
+                  <div className="text-gray-400 mb-0.5">May 15</div>
+                  <div className="font-bold flex items-center justify-center gap-1.5 text-white">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div> 278 Views
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                      {"views" in cv && (
-                        <span className="text-xs text-gray-500">
-                          Views: {Number(cv.views || 0)}
-                        </span>
-                      )}
+          {/* QUICK ACTIONS */}
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6 flex flex-col">
+            <h2 className="text-lg font-semibold mb-5">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button onClick={() => navigate('/builder')} className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+                <FilePlus className="w-4 h-4 text-indigo-400" /> Create New CV
+              </button>
+              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
+                <PenTool className="w-4 h-4 text-gray-400" /> AI Writer
+                <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold shadow-lg">New</span>
+              </button>
+              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+                <FileCheck className="w-4 h-4 text-blue-400" /> ATS Analyzer
+              </button>
+              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+                <Sparkles className="w-4 h-4 text-emerald-400" /> Job Match
+              </button>
+              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200 relative">
+                <MessageSquare className="w-4 h-4 text-orange-400" /> Interview Questions
+                <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold shadow-lg">New</span>
+              </button>
+              <button className="flex items-center gap-3 p-3.5 rounded-xl bg-[#1e2336] border border-white/5 hover:bg-white/10 transition-colors text-[13px] font-medium text-gray-200">
+                <FileSignature className="w-4 h-4 text-gray-400" /> Cover Letter Generator
+              </button>
+            </div>
+            <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors text-sm font-semibold border border-indigo-500/20 mt-auto">
+              <Share2 className="w-4 h-4" /> Share My CV
+            </button>
+          </div>
+        </div>
+
+        {/* BOTTOM ROW */}
+        <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
+          {/* RECENT CVS */}
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold">Recent CVs</h2>
+              <button className="text-xs font-semibold text-gray-300 hover:text-white bg-[#1e2336] px-4 py-2 rounded-xl border border-white/5 transition-colors">View All</button>
+            </div>
+            <div className="space-y-2">
+              {displayCvs.map(cv => (
+                <div key={cv.id} className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-16 bg-white rounded-md flex-shrink-0 border border-gray-200 overflow-hidden relative shadow-sm">
+                      <div className="absolute inset-1.5 space-y-1">
+                        <div className="flex gap-1 mb-2">
+                          <div className="w-3 h-3 bg-gray-300 rounded-sm"></div>
+                          <div className="flex-1 space-y-0.5">
+                             <div className="h-1 bg-gray-300 w-full rounded-full"></div>
+                             <div className="h-1 bg-gray-200 w-2/3 rounded-full"></div>
+                          </div>
+                        </div>
+                        <div className="h-1 bg-gray-200 w-full rounded-full"></div>
+                        <div className="h-1 bg-gray-200 w-5/6 rounded-full"></div>
+                        <div className="h-1 bg-gray-200 w-4/6 rounded-full"></div>
+                        <div className="mt-2 h-1 bg-gray-200 w-full rounded-full"></div>
+                        <div className="h-1 bg-gray-200 w-full rounded-full"></div>
+                        <div className="h-1 bg-gray-200 w-3/4 rounded-full"></div>
+                      </div>
                     </div>
-
-                    {cv.isPublished && publishedUrl ? (
-                      <div className="mt-2 break-all text-xs text-gray-400">
-                        {publishedUrl}
+                    <div>
+                      <div className="font-semibold text-[15px] mb-1.5">{cv.title}</div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-gray-400">{cv.date}</span>
+                        <span className={`px-2 py-0.5 rounded uppercase text-[9px] font-bold tracking-wider ${cv.status === 'Published' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                          {cv.status}
+                        </span>
                       </div>
-                    ) : cv.isPublic ? (
-                      <div className="mt-2 break-all text-xs text-gray-400">
-                        {legacyUrl}
-                      </div>
-                    ) : null}
+                    </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-2 sm:justify-end">
-                    {cv.isPublished ? (
-                      <>
-                        <button
-                          onClick={() => copyShare(publishedUrl)}
-                          className="rounded-xl glass-button px-4 py-2 text-sm"
-                        >
-                          Copy Link
-                        </button>
-
-                        <button
-                          onClick={() => openShare(cv)}
-                          className="rounded-xl glass-button px-4 py-2 text-sm"
-                        >
-                          Share
-                        </button>
-
-                        <a
-                          href={publishedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-xl glass-button px-4 py-2 text-sm"
-                        >
-                          Open Published
-                        </a>
-
-                        <button
-                          onClick={() => handleUnpublish(cv)}
-                          className="rounded-xl glass-button px-4 py-2 text-sm"
-                        >
-                          Unpublish
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {cv.isPublic ? (
-                          <button
-                            onClick={() => openShare(cv)}
-                            className="rounded-xl glass-button px-4 py-2 text-sm"
-                          >
-                            Share
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => openShare(cv)}
-                            className="cursor-not-allowed rounded-xl glass-button px-4 py-2 text-sm opacity-50"
-                            title="Enable Public Share in Builder to share"
-                          >
-                            Share
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => openPublishModal(cv)}
-                          className="rounded-xl glass-button px-4 py-2 text-sm"
-                        >
-                          Publish Now
-                        </button>
-                      </>
-                    )}
-
-                    <button
-                      onClick={() => handleDuplicate(cv)}
-                      className="rounded-xl glass-button px-4 py-2 text-sm"
-                    >
-                      Duplicate
-                    </button>
-
-                    <button
-                      onClick={() => handleDelete(cv.id, title)}
-                      className="rounded-xl glass-button px-4 py-2 text-sm"
-                    >
-                      Delete
-                    </button>
-
-                    <button
-                      onClick={() => navigate(`/builder/${cv.id}`)}
-                      className="rounded-xl glass-primary-button px-4 py-2 text-sm"
-                    >
-                      Edit
+                  <div className="flex items-center gap-8 pr-2">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-gray-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-200 leading-tight">{cv.views}</span>
+                        <span className="text-[10px] text-gray-500 font-medium">Views</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-gray-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-200 leading-tight">{cv.downloads}</span>
+                        <span className="text-[10px] text-gray-500 font-medium">Downloads</span>
+                      </div>
+                    </div>
+                    <button className="p-2 text-gray-500 hover:text-white bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-all border border-white/5 ml-2">
+                      <MoreVertical className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        )}
+
+          {/* RECENT ACTIVITY */}
+          <div className="bg-[#111622] border border-white/5 rounded-2xl p-6">
+            <h2 className="text-lg font-semibold mb-6">Recent Activity</h2>
+            <div className="space-y-6">
+              {recentActivity.map((activity, idx) => (
+                <div key={idx} className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-8 h-8 rounded-full ${activity.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                      <activity.icon className={`w-4 h-4 ${activity.color}`} />
+                    </div>
+                    <div>
+                      <div className="text-[13px] text-gray-400">{activity.action}</div>
+                      <div className="text-[13px] font-semibold text-gray-200 mt-0.5">{activity.cv}</div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium whitespace-nowrap mt-1">{activity.time}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* PRO TIP BANNER */}
+        <div className="bg-[#111622] border border-indigo-500/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(79,70,229,0.05)] mb-8">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-500/20 p-2.5 rounded-xl text-indigo-400">
+              <Lightbulb className="w-5 h-5" />
+            </div>
+            <div className="text-[13px] text-gray-300">
+              <span className="font-bold text-white">Pro Tip:</span> Keep your CV updated and optimized using our AI tools to get more views and better opportunities!
+            </div>
+          </div>
+          <button className="flex items-center gap-2 text-[13px] font-semibold text-white bg-indigo-600/20 hover:bg-indigo-600/40 px-5 py-2.5 rounded-xl transition-colors border border-indigo-500/20">
+            Try AI Tools <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
       </main>
-
-      {shareOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl glass-panel p-5 shadow-2xl text-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-bold">Share CV</div>
-                <div className="text-sm text-gray-300">{shareTitle}</div>
-              </div>
-
-                <button
-                onClick={closeShare}
-                className="rounded-xl glass-button px-3 py-2 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4 break-all rounded-xl glass-input p-3 text-sm">
-              {shareUrl}
-            </div>
-
-            <div className="mt-4 flex items-center justify-center">
-              <QRCodeCanvas value={shareUrl} size={180} />
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => copyShare(shareUrl)}
-                className="flex-1 rounded-xl glass-primary-button px-4 py-2 text-sm"
-              >
-                Copy Link
-              </button>
-
-              <a
-                href={shareUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 rounded-xl glass-button px-4 py-2 text-center text-sm"
-              >
-                Open
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {publishOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl glass-panel p-5 shadow-2xl text-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-bold">Publish CV</div>
-                <div className="text-sm text-gray-300">
-                  {publishCv ? getCvTitle(publishCv) : ""}
-                </div>
-              </div>
-
-              <button
-                onClick={closePublishModal}
-                className="rounded-xl glass-button px-3 py-2 text-sm"
-                disabled={publishing}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4">
-              <label className="text-sm font-medium">Custom slug</label>
-              <input
-                className="mt-1 w-full rounded-xl glass-input px-3 py-2"
-                placeholder="my-awesome-cv"
-                value={slugInput}
-                onChange={(e) => {
-                  setSlugInput(slugify(e.target.value));
-                  setSlugError("");
-                }}
-              />
-              <div className="mt-2 text-xs text-gray-500">
-                Your published link will be:
-              </div>
-              <div className="mt-1 break-all rounded-xl glass-input p-3 text-sm">
-                {getPublishedUrl(
-                  makePublishedSlug(
-                    slugify(slugInput || "my-cv"),
-                    publishCv?.id || "demoid"
-                  )
-                )}
-              </div>
-
-              <div className="mt-2 text-xs text-gray-500">
-                Publishing will also make this CV public automatically.
-              </div>
-
-              {slugError && (
-                <div className="mt-3 text-sm text-red-600">{slugError}</div>
-              )}
-            </div>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={handlePublish}
-                disabled={publishing}
-                className="flex-1 rounded-xl glass-primary-button px-4 py-2 text-sm disabled:opacity-60"
-              >
-                {publishing ? "Publishing..." : "Publish Now"}
-              </button>
-
-              <button
-                onClick={closePublishModal}
-                disabled={publishing}
-                className="flex-1 rounded-xl glass-button px-4 py-2 text-sm disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+      `}</style>
     </div>
   );
 }
