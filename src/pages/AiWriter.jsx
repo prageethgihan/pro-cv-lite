@@ -34,12 +34,14 @@ import {
   Loader2,
   Trash2,
   RotateCcw,
+  History,
 } from "lucide-react";
 import { generateAiWriterContent } from "../lib/ai";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import ProfileDropdown from "../components/ProfileDropdown";
 import NotificationDropdown from "../components/NotificationDropdown";
+import AIHistoryModal from "../components/AIHistoryModal";
 
 export default function AiWriter() {
   const navigate = useNavigate();
@@ -66,6 +68,7 @@ export default function AiWriter() {
   const [stats, setStats] = useState({ generated: 0, words: 0, saved: 0 });
   const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
   const [cooldown, setCooldown] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Fetch real history from localStorage safely
   React.useEffect(() => {
@@ -260,6 +263,25 @@ export default function AiWriter() {
 
   const handleClearContent = () => {
     setGeneratedContent("");
+  };
+
+  const handleDeleteHistory = (id) => {
+    setHistory(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      localStorage.setItem("procv_ai_history", JSON.stringify(updated));
+      // Recalculate stats
+      let totalWords = 0;
+      updated.forEach(item => {
+        if (item?.text) totalWords += item.text.split(/\s+/).length;
+      });
+      setStats({
+        generated: updated.length,
+        words: totalWords,
+        saved: updated.length * 0.1,
+      });
+      return updated;
+    });
+    showToast("History item removed");
   };
 
   const tabs = [
@@ -773,8 +795,16 @@ export default function AiWriter() {
                 )}
               </div>
 
-              <button className="mt-4 flex w-full items-center justify-center gap-2 text-xs font-medium text-gray-400 hover:text-white transition">
-                View All History <ArrowRight className="h-3 w-3" />
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] py-2.5 text-xs font-semibold text-gray-400 hover:border-indigo-500/30 hover:bg-indigo-500/5 hover:text-indigo-400 transition-all duration-200"
+              >
+                <History className="h-3.5 w-3.5" /> View All History
+                {history.length > 0 && (
+                  <span className="ml-1 rounded-full bg-indigo-500/20 border border-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-400">
+                    {history.length}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -849,6 +879,19 @@ export default function AiWriter() {
           </div>
         </div>
       </main>
+
+      {/* History Modal */}
+      <AIHistoryModal
+        open={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        history={history}
+        onReuse={(item) => {
+          setGeneratedContent(item.text);
+          setActiveTab(item.type);
+          showToast("Loaded from history");
+        }}
+        onDelete={handleDeleteHistory}
+      />
 
       {/* Toast Notification */}
       {toast.show && (
