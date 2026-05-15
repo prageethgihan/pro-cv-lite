@@ -589,20 +589,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* PRO TIP BANNER */}
-        <div className="bg-[#111622] border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(79,70,229,0.05)] mb-8">
-          <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
-            <div className="bg-indigo-500/20 p-2.5 rounded-xl text-indigo-400">
-              <Lightbulb className="w-5 h-5" />
-            </div>
-            <div className="text-[13px] text-gray-300">
-              <span className="font-bold text-white">Pro Tip:</span> Keep your CV updated and optimized using our AI tools to get more views and better opportunities!
-            </div>
-          </div>
-          <button className="flex items-center gap-2 text-[13px] font-semibold text-white bg-indigo-600/20 hover:bg-indigo-600/40 px-5 py-2.5 rounded-xl transition-colors border border-indigo-500/20">
-            Try AI Tools <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+
 
       </main>
       
