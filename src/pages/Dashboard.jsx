@@ -176,7 +176,7 @@ export default function Dashboard() {
     id: c.id,
     title: c.title || "Untitled CV",
     date: `Updated ${new Date(c.updatedAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`,
-    status: c.isPublished ? "Published" : "Draft",
+    status: (c.isPublished || c.isPublic) ? "Published" : "Draft",
     views: c.views || 0,
     downloads: c.downloads || 0
   })).slice(0, 4);
@@ -186,7 +186,7 @@ export default function Dashboard() {
     id: selectedCvData.id,
     title: selectedCvData.title || "Untitled CV",
     date: `Updated ${new Date(selectedCvData.updatedAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`,
-    status: selectedCvData.isPublished ? "Published" : "Draft",
+    status: (selectedCvData.isPublished || selectedCvData.isPublic) ? "Published" : "Draft",
     views: selectedCvData.views || 0,
     downloads: selectedCvData.downloads || 0,
     skills: selectedCvData.skills || [],
@@ -216,13 +216,13 @@ export default function Dashboard() {
     const date = new Date(cv.updatedAt?.seconds * 1000 || Date.now());
     return {
       id: cv.id,
-      action: cv.isPublished ? "Published" : "Updated",
+      action: (cv.isPublished || cv.isPublic) ? "Published" : "Updated",
       cv: cv.title || "Untitled CV",
       timestamp: date,
       time: timeAgo(date),
-      icon: cv.isPublished ? FileCheck : FileText,
-      color: cv.isPublished ? "text-emerald-400" : "text-blue-400",
-      bg: cv.isPublished ? "bg-emerald-500/20" : "bg-blue-500/20"
+      icon: (cv.isPublished || cv.isPublic) ? FileCheck : FileText,
+      color: (cv.isPublished || cv.isPublic) ? "text-emerald-400" : "text-blue-400",
+      bg: (cv.isPublished || cv.isPublic) ? "bg-emerald-500/20" : "bg-blue-500/20"
     };
   })
   .sort((a, b) => b.timestamp - a.timestamp)

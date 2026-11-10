@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
 /**
- * Export Service for Cover Letters
+ * Export Service for CVs & Cover Letters
  */
 
 export const exportService = {
@@ -13,40 +13,74 @@ export const exportService = {
     const element = document.getElementById(elementId);
     if (!element) return false;
 
-    // Save original styles
-    const originalStyle = element.style.cssText;
-    const originalColor = element.style.color;
-    const originalBg = element.style.backgroundColor;
-
     try {
-      // Force light theme for export
-      element.style.backgroundColor = "#ffffff";
-      element.style.color = "#000000";
-      
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff"
-      });
-      
-      // Restore original styles
-      element.style.cssText = originalStyle;
-      element.style.color = originalColor;
-      element.style.backgroundColor = originalBg;
-
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4"
       });
 
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      const pdfWidth = 210;
+      const pdfPageHeight = 297;
+
+      // Check if root element contains explicitly partitioned pages (.original-cv-page or .cv-page)
+      const pageElements = element.querySelectorAll(".original-cv-page, .cv-page");
+
+      if (pageElements && pageElements.length > 0) {
+        for (let i = 0; i < pageElements.length; i++) {
+          const pageEl = pageElements[i];
+          if (i > 0) {
+            pdf.addPage("a4", "portrait");
+          }
+
+          const originalStyle = pageEl.style.cssText;
+          pageEl.style.backgroundColor = "#ffffff";
+          pageEl.style.color = "#000000";
+
+          const canvas = await html2canvas(pageEl, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+            windowWidth: 794
+          });
+
+          pageEl.style.cssText = originalStyle;
+
+          const imgData = canvas.toDataURL("image/png");
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfPageHeight, undefined, "FAST");
+        }
+      } else {
+        // Fallback for single container: automatic pagination
+        const originalStyle = element.style.cssText;
+        element.style.backgroundColor = "#ffffff";
+        element.style.color = "#000000";
+
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff"
+        });
+
+        element.style.cssText = originalStyle;
+
+        const imgData = canvas.toDataURL("image/png");
+        const totalHeightMm = (canvas.height * pdfWidth) / canvas.width;
+        let heightRemaining = totalHeightMm;
+        let positionY = 0;
+
+        pdf.addImage(imgData, "PNG", 0, positionY, pdfWidth, totalHeightMm, undefined, "FAST");
+        heightRemaining -= pdfPageHeight;
+
+        while (heightRemaining > 5) {
+          positionY -= pdfPageHeight;
+          pdf.addPage("a4", "portrait");
+          pdf.addImage(imgData, "PNG", 0, positionY, pdfWidth, totalHeightMm, undefined, "FAST");
+          heightRemaining -= pdfPageHeight;
+        }
+      }
+
       pdf.save(`${filename}.pdf`);
       return true;
     } catch (err) {

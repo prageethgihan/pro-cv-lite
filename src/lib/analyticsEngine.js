@@ -41,7 +41,7 @@ export const analyticsEngine = {
       const totalViews = cvs.reduce((sum, c) => sum + (c.views || 0), 0);
       const totalDownloads = cvs.reduce((sum, c) => sum + (c.downloads || 0), 0);
       const totalQrScans = cvs.reduce((sum, c) => sum + (c.qrScans || 0), 0);
-      const publicCvs = cvs.filter(c => c.isPublished).length;
+      const publicCvs = cvs.filter(c => c.isPublished || c.isPublic).length;
       const privateCvs = totalCvs - publicCvs;
       
       // ATS Calculations
@@ -64,7 +64,7 @@ export const analyticsEngine = {
         activities.push({
           id: `cv-upd-${c.id}`,
           type: "CV",
-          action: c.isPublished ? "Published" : "Updated",
+          action: (c.isPublished || c.isPublic) ? "Published" : "Updated",
           target: c.title || "Untitled CV",
           timestamp: ts,
           icon: "file-text"

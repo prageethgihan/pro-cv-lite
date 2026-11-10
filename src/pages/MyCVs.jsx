@@ -159,11 +159,11 @@ export default function MyCVs() {
     title: c.title || "Untitled CV",
     date: `Updated ${new Date(c.updatedAt?.seconds * 1000 || Date.now()).toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'})}`,
     timestamp: c.updatedAt?.seconds || 0,
-    status: c.isPublished ? "Published" : "Draft",
+    status: (c.isPublished || c.isPublic) ? "Published" : "Draft",
     views: c.views || 0,
     downloads: c.downloads || 0,
     scans: c.scans || 0,
-    privacy: c.isPublic ? "Public" : "Private"
+    privacy: (c.isPublic || c.isPublished) ? "Public" : "Private"
   }));
 
   if (searchQuery) {

@@ -1366,7 +1366,7 @@ export default function Builder() {
       if (!user) return;
 
       if (!cvId) {
-        setCv(EMPTY_CV);
+        setCv(location.state?.cvData || EMPTY_CV);
         setTemplateId(location.state?.templateId || "t1");
         setIsPublic(false);
         setViews(0);
@@ -1529,6 +1529,7 @@ export default function Builder() {
         cv: cleanedCv,
         templateId,
         isPublic,
+        isPublished: isPublic,
         views: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -2014,6 +2015,7 @@ export default function Builder() {
         cv: cleanedCv,
         templateId,
         isPublic,
+        isPublished: isPublic,
         updatedAt: serverTimestamp(),
       };
 
@@ -2047,6 +2049,7 @@ export default function Builder() {
       try {
         await updateDoc(doc(db, "cvs", cvId), {
           isPublic,
+          isPublished: isPublic,
           updatedAt: serverTimestamp(),
         });
       } catch (e) {
@@ -2467,9 +2470,18 @@ export default function Builder() {
             </div>
 
             {!isPublic && (
-              <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300 flex items-center gap-2">
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <span>Your CV is currently <strong>Private</strong>. Enable Public Share in the form to make this link accessible.</span>
+              <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  <span>This CV is currently <strong>Private</strong>.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPublic(true)}
+                  className="px-3 py-1 text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg border border-amber-500/30 transition-colors whitespace-nowrap self-end sm:self-auto"
+                >
+                  Make Public & Publish
+                </button>
               </div>
             )}
 

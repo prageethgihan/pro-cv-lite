@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Download, LayoutDashboard, FileCheck, ArrowLeft } from "lucide-react";
+import { Download, LayoutDashboard, FileCheck, ArrowLeft, Sparkles } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 
 import html2canvas from "html2canvas";
@@ -88,7 +88,7 @@ export default function PublicCV() {
           // AUTH AWARE: Owners can see their own CV even if not public
           const isOwner = user && resolvedDoc.ownerId === user.uid;
 
-          if (!isOwner && resolvedDoc.isPublic !== true) {
+          if (!isOwner && !resolvedDoc.isPublic && !resolvedDoc.isPublished) {
             setError("This CV is private.");
             setLoading(false);
             return;
@@ -100,8 +100,6 @@ export default function PublicCV() {
           const q = query(
             collection(db, "cvs"),
             where("publishedSlug", "==", slug),
-            where("isPublished", "==", true),
-            where("isPublic", "==", true),
             limit(1)
           );
 
@@ -116,6 +114,13 @@ export default function PublicCV() {
           const first = snap.docs[0];
           resolvedDoc = { id: first.id, ...first.data() };
           ref = doc(db, "cvs", first.id);
+
+          const isOwner = user && resolvedDoc.ownerId === user.uid;
+          if (!isOwner && !resolvedDoc.isPublic && !resolvedDoc.isPublished) {
+            setError("This CV is private.");
+            setLoading(false);
+            return;
+          }
         }
 
         if (!resolvedDoc || !ref) {

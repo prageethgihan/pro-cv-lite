@@ -6,7 +6,7 @@ if (!apiKey) {
   console.warn("Gemini API key is missing. Check your .env file.");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // Global cooldown tracker
 let lastRequestTime = 0;
@@ -22,6 +22,9 @@ export async function safeAiCall(prompt, config = { model: "gemini-2.5-flash" },
   const MAX_RETRIES = 3;
   
   const executeRequest = async (retryCount = 0) => {
+    if (!apiKey || !genAI) {
+      throw new Error("API_KEY_MISSING: Gemini API key is missing. Please add VITE_GEMINI_API_KEY to your .env file and rebuild the site.");
+    }
     // 1. Cooldown protection
     const now = Date.now();
     const timeSinceLast = now - lastRequestTime;
@@ -90,6 +93,12 @@ export async function safeAiCall(prompt, config = { model: "gemini-2.5-flash" },
 export function getFriendlyAiError(error) {
   const msg = error?.message?.toLowerCase() || "";
   
+  if (msg.includes("api_key_missing") || msg.includes("gemini api key is missing") || msg.includes(".env")) {
+    return "Gemini API key is not configured. Please add VITE_GEMINI_API_KEY to your .env file and rebuild the site.";
+  }
+  if (msg.includes("api key not valid") || msg.includes("key not valid") || msg.includes("api_key_invalid") || msg.includes("400 bad request") || msg.includes("401") || msg.includes("403")) {
+    return "Invalid Gemini API key. Please verify your VITE_GEMINI_API_KEY.";
+  }
   if (msg.includes("503") || msg.includes("overloaded") || msg.includes("service_unavailable")) {
     return "AI servers are currently experiencing high demand. Please wait a moment and try again.";
   }
@@ -99,11 +108,11 @@ export function getFriendlyAiError(error) {
   if (msg.includes("timeout") || msg.includes("ai_timeout")) {
     return "AI analysis is taking longer than expected. Please wait a moment and try again.";
   }
-  if (msg.includes("fetch") || msg.includes("network")) {
+  if (msg.includes("failed to fetch") || msg.includes("networkerror") || (typeof navigator !== "undefined" && !navigator.onLine)) {
     return "Network error. Please check your connection and try again.";
   }
   
-  return "Analysis failed temporarily. Please try again.";
+  return "AI analysis failed. Please verify your API key and connection.";
 }
 
 function cleanAiText(text) {

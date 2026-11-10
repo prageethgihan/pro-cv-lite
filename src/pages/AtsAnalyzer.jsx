@@ -11,31 +11,41 @@ import {
   User, Settings, Sun, Moon, Bell, ChevronDown, Menu, UploadCloud,
   CheckCircle2, XCircle, Lightbulb, ArrowRight, ShieldCheck,
   Target, FileDigit, Eye, Zap, RotateCcw, Loader2, X, Copy,
-  Info
+  Info, Check, ExternalLink, Layers, Flame, Filter, Download
 } from "lucide-react";
 import { extractCvText, analyzeWithGemini, improveSection, validateCvForAts } from "../lib/atsAnalysis";
 import Template1 from "../templates/Template1";
+import Template2 from "../templates/Template2";
+import Template3 from "../templates/Template3";
+import Template4 from "../templates/Template4";
+import Template5 from "../templates/Template5";
+import Template6 from "../templates/Template6";
+import OriginalUploadedTemplate from "../templates/OriginalUploadedTemplate";
+import { exportService } from "../lib/exportService";
 
 const EMPTY_CV = {
   fullName: "",
   jobTitle: "",
+  summaryTitle: "ABOUT ME",
   summary: "",
-  contact: { phone: "", email: "", address: "", website: "" },
+  contact: { phone: "", email: "", address: "", website: "", linkedin: "", github: "" },
   education: [],
   skills: [],
+  technologies: [],
   experience: [],
   projects: [],
   certifications: [],
+  references: [],
   achievements: [],
   languages: [],
   themeMode: "auto",
   themeManual: {
-    primary: "#6366f1",
-    secondary: "#4f46e5",
-    accent: "#818cf8",
+    primary: "#000000",
+    secondary: "#333333",
+    accent: "#000000",
     bg: "#ffffff",
-    card: "#f9fafb",
-    text: "#111827"
+    card: "#ffffff",
+    text: "#000000"
   }
 };
 
@@ -50,6 +60,26 @@ function ScoreRing({ score, color, size = 80, strokeW = 6 }) {
         strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" />
     </svg>
   );
+}
+
+const TEMPLATES_LIST = [
+  { id: "t3", name: "Classic ATS (Recommended)", comp: Template3, desc: "Clean single-column standard ATS layout with neat dividers" },
+  { id: "t1", name: "Modern Sidebar", comp: Template1, desc: "Two-column design with prominent colored left sidebar" },
+  { id: "t2", name: "Modern Dark", comp: Template2, desc: "Sleek dark theme for modern technical roles" },
+  { id: "t4", name: "Executive Timeline", comp: Template4, desc: "Sophisticated timeline format for senior roles" },
+  { id: "t5", name: "Minimalist", comp: Template5, desc: "Ultra-clean modern whitespace design" },
+  { id: "t6", name: "Sri Lanka Academic", comp: Template6, desc: "Detailed academic & comprehensive layout" },
+];
+
+function detectSectionFromText(text) {
+  const t = (text || "").toLowerCase();
+  if (t.includes("experience") || t.includes("work") || t.includes("role") || t.includes("job") || t.includes("internship")) return "experience";
+  if (t.includes("skill") || t.includes("keyword") || t.includes("technology") || t.includes("tool") || t.includes("cloud")) return "skills";
+  if (t.includes("project") || t.includes("portfolio")) return "projects";
+  if (t.includes("summary") || t.includes("profile") || t.includes("objective") || t.includes("headline")) return "summary";
+  if (t.includes("education") || t.includes("degree") || t.includes("course") || t.includes("gpa") || t.includes("academic")) return "education";
+  if (t.includes("certif")) return "certifications";
+  return "experience";
 }
 
 export default function AtsAnalyzer() {
@@ -91,6 +121,33 @@ export default function AtsAnalyzer() {
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [lastUpdatedSection, setLastUpdatedSection] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Template and preview states
+  const [selectedTemplate, setSelectedTemplate] = useState("t3");
+  const [previewMode, setPreviewMode] = useState("original-template"); // "original-template" | "alternative-templates" | "raw-pdf"
+  const [previewPage, setPreviewPage] = useState("all"); // "all" | 1 | 2
+  const [activeImproveTab, setActiveImproveTab] = useState("all");
+  const [copiedText, setCopiedText] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const filePreviewUrl = React.useMemo(() => {
+    if (file && file instanceof File && (file.type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf"))) {
+      try {
+        return URL.createObjectURL(file);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }, [file]);
+
+  React.useEffect(() => {
+    return () => {
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+    };
+  }, [filePreviewUrl]);
 
   const validateFile = async (f) => {
     setIsValidating(true);
@@ -227,20 +284,32 @@ export default function AtsAnalyzer() {
       };
       localStorage.setItem("procv_ats_history", JSON.stringify([newEntry, ...savedHistory].slice(0, 50)));
 
+      if (data.recommendedTemplate) {
+        setSelectedTemplate(data.recommendedTemplate);
+      } else {
+        setSelectedTemplate("t3");
+      }
+
       if (data.parsedCv) {
         // Map parsed CV to builder format (optional, keeping current behavior)
         const mappedCv = {
           ...EMPTY_CV,
           fullName: data.parsedCv.fullName || "Your Name",
           jobTitle: data.parsedCv.jobTitle || "Professional Title",
+          summaryTitle: data.parsedCv.summaryTitle || "ABOUT ME",
           summary: data.parsedCv.summary || "",
           contact: { ...EMPTY_CV.contact, ...data.parsedCv.contact },
           education: data.parsedCv.education || [],
           skills: data.parsedCv.skills || [],
+          technologies: data.parsedCv.technologies || [],
           experience: data.parsedCv.experience || [],
           projects: data.parsedCv.projects || [],
+          certifications: data.parsedCv.certifications || [],
+          references: data.parsedCv.references || [],
+          achievements: data.parsedCv.achievements || [],
         };
         setCvData(mappedCv);
+        setPreviewMode("original-template");
       }
     } catch (e) {
       setError(e.message || "Auto-analysis failed.");
@@ -266,6 +335,12 @@ export default function AtsAnalyzer() {
       
       if (processingRef.current) {
         setResult(data);
+
+        if (data.recommendedTemplate) {
+          setSelectedTemplate(data.recommendedTemplate);
+        } else {
+          setSelectedTemplate("t3");
+        }
         
         // Persist ATS history for Analytics
         try {
@@ -289,16 +364,20 @@ export default function AtsAnalyzer() {
             ...EMPTY_CV,
             fullName: data.parsedCv.fullName || "Your Name",
             jobTitle: data.parsedCv.jobTitle || "Professional Title",
+            summaryTitle: data.parsedCv.summaryTitle || "ABOUT ME",
             summary: data.parsedCv.summary || "",
             contact: { ...EMPTY_CV.contact, ...data.parsedCv.contact },
             education: data.parsedCv.education || [],
             skills: data.parsedCv.skills || [],
+            technologies: data.parsedCv.technologies || [],
             experience: data.parsedCv.experience || [],
             projects: data.parsedCv.projects || [],
             certifications: data.parsedCv.certifications || [],
+            references: data.parsedCv.references || [],
             achievements: data.parsedCv.achievements || [],
           };
           setCvData(mappedCv);
+          setPreviewMode("original-template");
         }
         setCooldown(true);
         setTimeout(() => setCooldown(false), 3000);
@@ -320,57 +399,137 @@ export default function AtsAnalyzer() {
     if (!improvedContent) return;
 
     // Save current state for undo
-    setHistory(prev => [...prev, { section, data: { ...cvData } }]);
+    setHistory(prev => [...prev, { section, data: JSON.parse(JSON.stringify(cvData)) }]);
     
     const newCvData = { ...cvData };
     let sectionNameForToast = section;
+    const s = (section || "").toLowerCase();
 
-    if (section === "summary") {
-      newCvData.summary = improvedContent;
+    if (s.includes("summary") || s.includes("profile") || s.includes("about")) {
+      let title = newCvData.summaryTitle || "PROFESSIONAL SUMMARY";
+      let body = improvedContent.trim();
+      
+      const firstLineBreak = body.indexOf("\n");
+      if (firstLineBreak !== -1) {
+        const firstLine = body.substring(0, firstLineBreak).trim().replace(/^#+\s*/, "").replace(/\*\*/g, "");
+        if (/^(professional summary|summary|about me|profile|overview|about)$/i.test(firstLine)) {
+          title = firstLine.toUpperCase();
+          body = body.substring(firstLineBreak + 1).trim();
+        }
+      } else {
+        if (/^(professional summary|summary|about me|profile|overview|about)$/i.test(body)) {
+          title = body.toUpperCase();
+        }
+      }
+      
+      // If the heading was 'ABOUT ME', update it to 'PROFESSIONAL SUMMARY' as advised by ATS
+      if (title.toUpperCase().includes("ABOUT")) {
+        title = "PROFESSIONAL SUMMARY";
+      }
+
+      newCvData.summaryTitle = title;
+      newCvData.summary = body;
       sectionNameForToast = "Professional Summary";
-    } else if (section === "skills") {
-      // Intelligent merge: split by comma or newline, trim, remove empty, and filter duplicates
+    } else if (s.includes("skill")) {
+      // Intelligent merge: split by comma, newline or bullets
       const newSkills = improvedContent
-        .split(/[,\n]/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+        .split(/[,\n•·\-\*]/)
+        .map(x => x.trim().replace(/^[-•*]\s*/, ""))
+        .filter(x => x.length > 1 && !x.includes(":") && x.length < 50);
       
       const existingSkills = Array.isArray(newCvData.skills) ? newCvData.skills : [];
-      const mergedSkills = [...new Set([...existingSkills, ...newSkills])];
-      newCvData.skills = mergedSkills;
+      newCvData.skills = [...new Set([...existingSkills, ...newSkills])];
       sectionNameForToast = "Skills";
-    } else if (section === "experience") {
-      // Update first experience item description or handle carefully
+    } else if (s.includes("experience")) {
       if (newCvData.experience && newCvData.experience.length > 0) {
         newCvData.experience = [
           { ...newCvData.experience[0], description: improvedContent },
           ...newCvData.experience.slice(1)
         ];
       } else {
-        newCvData.experience = [{ role: "Role", company: "Company", start: "", end: "", description: improvedContent }];
+        newCvData.experience = [{
+          role: newCvData.jobTitle || "Software Professional",
+          company: "Company",
+          start: "2023",
+          end: "Present",
+          description: improvedContent
+        }];
       }
       sectionNameForToast = "Work Experience";
-    } else if (section === "projects") {
+    } else if (s.includes("project")) {
       if (newCvData.projects && newCvData.projects.length > 0) {
         newCvData.projects = [
           { ...newCvData.projects[0], description: improvedContent },
           ...newCvData.projects.slice(1)
         ];
       } else {
-        newCvData.projects = [{ title: "Project", description: improvedContent }];
+        newCvData.projects = [{ title: "Featured Project", description: improvedContent }];
       }
       sectionNameForToast = "Projects";
+    } else if (s.includes("education")) {
+      if (newCvData.education && newCvData.education.length > 0) {
+        newCvData.education = [
+          { ...newCvData.education[0], details: improvedContent },
+          ...newCvData.education.slice(1)
+        ];
+      } else {
+        newCvData.education = [{
+          degree: "Bachelor's Degree",
+          university: "University",
+          years: "2019 - 2023",
+          details: improvedContent
+        }];
+      }
+      sectionNameForToast = "Education";
+    } else if (s.includes("cert")) {
+      const items = improvedContent
+        .split(/[,\n•·\-\*]/)
+        .map(c => c.trim().replace(/^[-•*]\s*/, ""))
+        .filter(Boolean);
+      const newCerts = items.map(c => ({ name: c, issuer: "Accredited Provider", year: new Date().getFullYear().toString() }));
+      newCvData.certifications = [...(newCvData.certifications || []), ...newCerts];
+      sectionNameForToast = "Certifications";
+    } else {
+      newCvData.summary = improvedContent;
+      sectionNameForToast = "CV Content";
     }
 
     setCvData(newCvData);
     setLastUpdatedSection(sectionNameForToast);
-    setSuccessMessage(`CV updated successfully: ${sectionNameForToast} section.`);
+    setSuccessMessage(`Original Template updated: ${sectionNameForToast} section optimized!`);
     setShowUndoToast(true);
+    setPreviewMode("original-template");
     
-    // Clear highlight after 2 seconds
-    setTimeout(() => setLastUpdatedSection(""), 2000);
+    // Clear highlight after 3.5 seconds
+    setTimeout(() => setLastUpdatedSection(""), 3500);
     // Hide toast after 6 seconds
     setTimeout(() => setShowUndoToast(false), 6000);
+  };
+
+  const downloadUpdatedPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const filename = `${(cvData.fullName || "Updated_CV").replace(/\s+/g, "_")}_ATS_Optimized`;
+
+      // If the user hasn't applied any AI improvements yet, directly provide the original uploaded PDF
+      if (history.length === 0 && file && file instanceof File && (file.type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf"))) {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${filename}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      await exportService.exportToPDF("cv-pdf-export-root", filename);
+    } catch (e) {
+      console.error("Failed to export PDF", e);
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const undoLastAction = () => {
@@ -388,18 +547,29 @@ export default function AtsAnalyzer() {
     setFile(null); setResult(null); setError(""); setJobDesc(""); setCvText("");
     setValidationError(""); setValidationWarning(""); setIsInvalidFile(false);
     setCvData(EMPTY_CV); setHistory([]); setShowUndoToast(false);
+    setSelectedTemplate("t3");
   };
 
-  const handleAutoImprove = async (section) => {
+  const handleAutoImprove = async (section, customInstruction = "", displayLabel = "") => {
     if (!cvText || optimizationLoading) return;
     setOptimizationLoading(true);
     setOptimizationError("");
     setAiImprovementResult(null);
+    setCopiedText(false);
     try {
-      const res = await improveSection(cvText, result?.missingKeywords || [], section);
-      setAiImprovementResult({ section, content: res });
+      const res = await improveSection(
+        cvText, 
+        result?.missingKeywords || [], 
+        section, 
+        customInstruction
+      );
+      setAiImprovementResult({ 
+        section, 
+        content: res, 
+        label: displayLabel || `Improved ${section}` 
+      });
     } catch (err) {
-      setOptimizationError(err.message);
+      setOptimizationError(err.message || "Failed to generate AI improvement.");
     } finally {
       setOptimizationLoading(false);
     }
@@ -407,7 +577,114 @@ export default function AtsAnalyzer() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
   };
+
+  // Generate dynamic list of all actionable improvement cards from ATS diagnosis
+  const actionableImprovements = React.useMemo(() => {
+    if (!result) return [];
+    const items = [];
+
+    // 1. Missing Keywords Action
+    if (result.missingKeywords && result.missingKeywords.length > 0) {
+      items.push({
+        id: "kw-incorporate",
+        category: "keywords",
+        section: "skills",
+        title: "Integrate Missing Target Keywords",
+        subtitle: `Inject ${result.missingKeywords.slice(0, 4).join(", ")} naturally into Skills & Experience`,
+        badge: "+8% ATS Boost",
+        badgeType: "keywords",
+        instruction: `Naturally incorporate and emphasize these critical missing keywords: ${result.missingKeywords.join(", ")}. Optimize skills and summary with these ATS terms.`
+      });
+    }
+
+    // 2. Measurable Metrics Action
+    items.push({
+      id: "action-metrics",
+      category: "weak",
+      section: "experience",
+      title: "Add Measurable Metrics & Numbers",
+      subtitle: "Add quantifiable achievements (percentages, scale, numbers) to experience bullets",
+      badge: "+5% Impact",
+      badgeType: "metrics",
+      instruction: "Add quantifiable metrics, percentages, numbers, and scale to experience bullet points (e.g. improved performance by 35%, scaled to 50K+ users)."
+    });
+
+    // 3. Weak Sections from ATS Diagnostic
+    const sectionDescriptions = {
+      summary: "Write a high-converting, keyword-optimized professional summary.",
+      experience: "Elevate experience bullet points using strong action verbs & impact.",
+      skills: "Reorganize skills into high-ranking technical & professional keywords.",
+      education: "Format education cleanly with degree, university & relevant coursework.",
+      projects: "Detail technical architecture, tools used, and measurable results for projects."
+    };
+
+    Object.entries(result.sections || {}).forEach(([sec, score]) => {
+      items.push({
+        id: `sec-${sec}`,
+        category: score < 70 ? "weak" : "sections",
+        section: sec,
+        title: `Optimize ${sec.charAt(0).toUpperCase() + sec.slice(1)} Section`,
+        subtitle: sectionDescriptions[sec] || `Enhance ${sec} for ATS score improvement.`,
+        score: score,
+        badge: `${score}% Score`,
+        badgeType: score < 50 ? "danger" : score < 70 ? "warning" : "success",
+        instruction: `Fully optimize the ${sec} section to improve its ATS score from ${score}% to 95%+. Ensure high keyword density and professional ATS phrasing.`
+      });
+    });
+
+    // 4. AI Suggestions from result
+    (result.suggestions || []).forEach((s, idx) => {
+      const targetSec = detectSectionFromText(s.text);
+      items.push({
+        id: `sug-${idx}`,
+        category: "suggestions",
+        section: targetSec,
+        title: s.text,
+        subtitle: `Target: ${targetSec.charAt(0).toUpperCase() + targetSec.slice(1)} Section`,
+        badge: s.impact || "+3%",
+        badgeType: "suggestion",
+        instruction: `Implement this specific ATS recommendation: "${s.text}". Rewrite the ${targetSec} section accordingly.`
+      });
+    });
+
+    // 5. Standard Sections Shortcuts
+    ["summary", "experience", "skills", "projects", "education", "certifications"].forEach(sec => {
+      if (!items.some(it => it.section === sec && it.category === "sections")) {
+        items.push({
+          id: `std-${sec}`,
+          category: "sections",
+          section: sec,
+          title: `Enhance ${sec.charAt(0).toUpperCase() + sec.slice(1)}`,
+          subtitle: `Refine and polish the ${sec} section for ATS algorithms`,
+          badge: "Section",
+          badgeType: "neutral",
+          instruction: `Optimize and rewrite the ${sec} section for high ATS compatibility.`
+        });
+      }
+    });
+
+    return items;
+  }, [result]);
+
+  const filteredImprovements = React.useMemo(() => {
+    if (activeImproveTab === "all") return actionableImprovements;
+    if (activeImproveTab === "weak") {
+      return actionableImprovements.filter(it => it.category === "weak" || (it.score !== undefined && it.score < 70));
+    }
+    if (activeImproveTab === "keywords") {
+      return actionableImprovements.filter(it => it.category === "keywords" || it.id.includes("kw"));
+    }
+    if (activeImproveTab === "suggestions") {
+      return actionableImprovements.filter(it => it.category === "suggestions");
+    }
+    if (activeImproveTab === "sections") {
+      return actionableImprovements.filter(it => it.category === "sections");
+    }
+    return actionableImprovements;
+  }, [actionableImprovements, activeImproveTab]);
 
   const verdictColor = (score) => score >= 80 ? "text-emerald-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
   const ringColor   = (score) => score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444";
@@ -874,107 +1151,247 @@ export default function AtsAnalyzer() {
 
       {/* AI OPTIMIZATION MODAL */}
       {isOptimizeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[#0A0D14] border border-white/10 w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-[#0A0D14] border border-white/10 w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#111622]">
+            <div className="p-5 sm:p-6 border-b border-white/5 flex items-center justify-between bg-[#111622]">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-                  <Sparkles className="w-5 h-5" />
+                <div className="p-2.5 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                  <Sparkles className="w-6 h-6 animate-pulse" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Optimize with AI</h2>
-                  <p className="text-xs text-gray-400">Enhance your CV using ATS analysis data</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-white">Optimize with AI</h2>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      1-Click ATS Enhancer
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Click any detected flaw below to instantly improve your CV for maximum ATS score.
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setIsOptimizeModalOpen(false)} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
-                <X className="w-6 h-6 text-gray-400" />
+              <button 
+                onClick={() => setIsOptimizeModalOpen(false)} 
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gray-400 hover:text-white"
+              >
+                <X className="w-6 h-6" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[#070B14]">
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr] gap-8">
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar bg-[#070B14] space-y-8">
+              
+              {/* TOP SPLIT: TIPS & 1-CLICK ACTIONS */}
+              <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.6fr] gap-6">
                 
-                {/* Left: Improvement Tips */}
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Lightbulb className="w-4 h-4 text-yellow-500" />
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Improvement Tips</h3>
+                {/* Left: Interactive Improvement Tips */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-400" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">Detected Deficiencies (Click to Fix)</h3>
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-medium">Click any item ⚡</span>
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-[#111622] border border-white/5">
-                      <div className="text-[10px] text-gray-500 font-bold uppercase mb-2">Critical Actions</div>
-                      <div className="space-y-3">
-                        {result?.missingKeywords?.length > 0 && (
-                          <div className="flex items-start gap-2 text-xs">
-                            <ArrowRight className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-300">Incorporate missing keywords: <span className="text-indigo-400">{result.missingKeywords.slice(0, 3).join(", ")}</span></span>
+                  {/* Critical Actions Card */}
+                  <div className="p-4 rounded-2xl bg-[#111622] border border-white/5 space-y-3">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+                      <span>Critical ATS Actions</span>
+                      <span className="text-indigo-400 text-[10px]">1-Click Triggers</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {result?.missingKeywords?.length > 0 && (
+                        <button
+                          onClick={() => handleAutoImprove("skills", `Naturally incorporate and emphasize missing keywords: ${result.missingKeywords.join(", ")}`, "Incorporate Missing Keywords")}
+                          className="w-full text-left p-2.5 rounded-xl bg-white/[0.03] hover:bg-indigo-600/10 border border-white/5 hover:border-indigo-500/40 transition-all group flex items-start gap-2.5"
+                        >
+                          <Flame className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-200 font-medium leading-snug">
+                              Missing keywords: <span className="text-indigo-400 font-semibold">{result.missingKeywords.slice(0, 3).join(", ")}</span>
+                            </div>
+                            <div className="text-[10px] text-indigo-400/80 group-hover:text-indigo-300 flex items-center gap-1 mt-1">
+                              <Zap className="w-3 h-3" /> Click to auto-inject into Skills & Experience
+                            </div>
                           </div>
-                        )}
-                        {Object.entries(result?.sections || {}).filter(([_, s]) => s < 70).map(([name, _]) => (
-                          <div key={name} className="flex items-start gap-2 text-xs">
-                            <ArrowRight className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-300 capitalize">Improve your {name} section.</span>
+                        </button>
+                      )}
+
+                      {Object.entries(result?.sections || {}).filter(([_, s]) => s < 70).map(([name, score]) => (
+                        <button
+                          key={name}
+                          onClick={() => handleAutoImprove(name, `Fully rewrite and optimize the ${name} section to improve ATS score from ${score}% to 95%+`, `Optimize ${name}`)}
+                          className="w-full text-left p-2.5 rounded-xl bg-white/[0.03] hover:bg-indigo-600/10 border border-white/5 hover:border-indigo-500/40 transition-all group flex items-start gap-2.5"
+                        >
+                          <ArrowRight className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-200 capitalize font-medium flex items-center justify-between">
+                              <span>Improve your {name} section</span>
+                              <span className="text-[10px] text-red-400 font-bold bg-red-500/10 px-1.5 py-0.5 rounded">{score}%</span>
+                            </div>
+                            <div className="text-[10px] text-gray-500 group-hover:text-indigo-300 flex items-center gap-1 mt-0.5">
+                              <Zap className="w-3 h-3" /> Rewrite & optimize for ATS
+                            </div>
                           </div>
-                        ))}
-                        <div className="flex items-start gap-2 text-xs">
-                          <ArrowRight className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-300">Add more measurable achievements (numbers, %).</span>
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={() => handleAutoImprove("experience", "Add measurable achievements with quantifiable metrics, percentages, numbers, and scale", "Quantify Achievements")}
+                        className="w-full text-left p-2.5 rounded-xl bg-white/[0.03] hover:bg-indigo-600/10 border border-white/5 hover:border-indigo-500/40 transition-all group flex items-start gap-2.5"
+                      >
+                        <Zap className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-200 font-medium">Add measurable achievements (numbers, %)</div>
+                          <div className="text-[10px] text-emerald-400/80 group-hover:text-emerald-300 flex items-center gap-1 mt-0.5">
+                            <Zap className="w-3 h-3" /> Apply Google XYZ formula to bullet points
+                          </div>
                         </div>
-                      </div>
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="p-4 rounded-2xl bg-[#111622] border border-white/5">
-                      <div className="text-[10px] text-gray-500 font-bold uppercase mb-2">Top Suggestions</div>
-                      <div className="space-y-2">
-                        {(result?.suggestions || []).slice(0, 3).map((s, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs">
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-300">{s.text} <span className="text-emerald-400 font-bold ml-1">{s.impact}</span></span>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Top Suggestions Card */}
+                  <div className="p-4 rounded-2xl bg-[#111622] border border-white/5 space-y-3">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center justify-between">
+                      <span>Top Suggestions</span>
+                      <span className="text-emerald-400 text-[10px]">Boost Impact</span>
                     </div>
+                    <div className="space-y-2">
+                      {(result?.suggestions || []).slice(0, 3).map((s, i) => {
+                        const targetSec = detectSectionFromText(s.text);
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => handleAutoImprove(targetSec, s.text, `Suggestion Fix: ${s.text.substring(0, 24)}...`)}
+                            className="w-full text-left p-2.5 rounded-xl bg-white/[0.03] hover:bg-indigo-600/10 border border-white/5 hover:border-indigo-500/40 transition-all group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs text-gray-300 leading-snug group-hover:text-white transition-colors">{s.text}</span>
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                {s.impact}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-indigo-400 mt-1 flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                              <Sparkles className="w-3 h-3" /> Click to auto-execute in {targetSec}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                    <div className="p-4 rounded-2xl bg-[#111622] border border-white/5">
-                      <div className="text-[10px] text-gray-500 font-bold uppercase mb-2">Weak Sections</div>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(result?.sections || {}).map(([name, score]) => (
-                          <div key={name} className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${score >= 80 ? "border-emerald-500/20 text-emerald-400 bg-emerald-500/5" : score >= 60 ? "border-yellow-500/20 text-yellow-400 bg-yellow-500/5" : "border-red-500/20 text-red-400 bg-red-500/5"}`}>
-                            {name.toUpperCase()}: {score}%
-                          </div>
-                        ))}
-                      </div>
+                  {/* Weak Sections Badges Card */}
+                  <div className="p-4 rounded-2xl bg-[#111622] border border-white/5 space-y-2">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      Weak Sections (Click badge to optimize)
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(result?.sections || {}).map(([name, score]) => (
+                        <button
+                          key={name}
+                          onClick={() => handleAutoImprove(name, `Fully optimize the ${name} section to improve score from ${score}%`, `Fix ${name}`)}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 ${
+                            score >= 80 
+                              ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" 
+                              : score >= 60 
+                              ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20" 
+                              : "border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 animate-pulse"
+                          }`}
+                        >
+                          <Zap className="w-3 h-3" />
+                          <span>{name.toUpperCase()}: {score}%</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Right: AI Auto-Improve */}
+                {/* Right: AI Auto-Improve Action Board */}
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Zap className="w-4 h-4 text-indigo-400" />
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">AI Auto-Improve</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-indigo-400" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">AI Auto-Improve Hub</h3>
+                    </div>
+                    {aiImprovementResult && (
+                      <button 
+                        onClick={() => setAiImprovementResult(null)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors flex items-center gap-1"
+                      >
+                        ← Back to options
+                      </button>
+                    )}
                   </div>
 
+                  {/* If not generated yet and not loading: show dynamic list of actionable buttons */}
                   {!aiImprovementResult && !optimizationLoading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-white/5 border-dashed rounded-3xl bg-[#111622]/50">
-                      <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 flex items-center justify-center mb-4">
-                        <Sparkles className="w-8 h-8 text-indigo-500" />
-                      </div>
-                      <h4 className="text-lg font-bold text-white mb-2">Generate AI Improvements</h4>
-                      <p className="text-xs text-gray-400 mb-6 max-w-xs">Select a section to have AI rewrite it professionally while including missing keywords.</p>
-                      
-                      <div className="grid grid-cols-2 gap-3 w-full">
-                        {["summary", "experience", "skills", "projects"].map(section => (
+                    <div className="flex-1 flex flex-col p-4 rounded-3xl bg-[#111622] border border-white/5">
+                      {/* Filter category pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-3 border-b border-white/5 custom-scrollbar">
+                        {[
+                          { id: "all", label: "All Fixes", count: actionableImprovements.length },
+                          { id: "weak", label: "Weak Sections", count: actionableImprovements.filter(x => x.category === "weak" || (x.score !== undefined && x.score < 70)).length },
+                          { id: "keywords", label: "Keywords", count: actionableImprovements.filter(x => x.category === "keywords").length },
+                          { id: "suggestions", label: "AI Suggestions", count: actionableImprovements.filter(x => x.category === "suggestions").length },
+                          { id: "sections", label: "Sections", count: actionableImprovements.filter(x => x.category === "sections").length },
+                        ].map(tab => (
                           <button
-                            key={section}
-                            onClick={() => handleAutoImprove(section)}
-                            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:border-indigo-500/50 hover:bg-indigo-500/5 text-xs font-semibold text-gray-300 transition-all capitalize"
+                            key={tab.id}
+                            onClick={() => setActiveImproveTab(tab.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                              activeImproveTab === tab.id
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
+                            }`}
                           >
-                            Improve {section}
+                            {tab.label} {tab.count > 0 && <span className="opacity-70 text-[10px]">({tab.count})</span>}
                           </button>
+                        ))}
+                      </div>
+
+                      <div className="text-xs text-gray-400 mb-3 px-1">
+                        Select any item below to have AI rewrite it professionally with 1-click:
+                      </div>
+
+                      {/* Dynamic Actionable Items Cards Grid */}
+                      <div className="space-y-2.5 overflow-y-auto max-h-[380px] pr-1 custom-scrollbar">
+                        {filteredImprovements.map(item => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 rounded-2xl bg-[#0A0D14] border border-white/5 hover:border-indigo-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                          >
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <div className="p-2 rounded-xl bg-indigo-600/10 text-indigo-400 mt-0.5 border border-indigo-500/20 flex-shrink-0 group-hover:scale-110 transition-transform">
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    item.badgeType === "danger" ? "bg-red-500/15 text-red-400 border border-red-500/20" :
+                                    item.badgeType === "warning" ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" :
+                                    item.badgeType === "keywords" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-extrabold" :
+                                    "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold"
+                                  }`}>
+                                    {item.badge}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mt-1 leading-relaxed line-clamp-2">{item.subtitle}</p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleAutoImprove(item.section, item.instruction, item.title)}
+                              className="self-end sm:self-center px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <Zap className="w-3.5 h-3.5" />
+                              1-Click Fix
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -982,10 +1399,10 @@ export default function AtsAnalyzer() {
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-white/5 rounded-3xl bg-[#111622]">
                       <div className="relative mb-6">
                         <div className="w-16 h-16 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-                        <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-indigo-500 animate-pulse" />
+                        <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-indigo-400 animate-pulse" />
                       </div>
-                      <h4 className="text-lg font-bold text-white mb-1">Optimizing Content...</h4>
-                      <p className="text-xs text-gray-400">Rewriting your section using AI</p>
+                      <h4 className="text-lg font-bold text-white mb-1">Optimizing Section...</h4>
+                      <p className="text-xs text-gray-400 max-w-xs">AI is applying ATS algorithms, keywords, and action metrics...</p>
                       <div className="mt-6 w-full max-w-xs h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-indigo-500 animate-shimmer" style={{ width: '100%', background: 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.4), transparent)', backgroundSize: '200% 100%' }} />
                       </div>
@@ -995,38 +1412,54 @@ export default function AtsAnalyzer() {
                       <XCircle className="w-12 h-12 text-red-500 mb-4" />
                       <h4 className="text-lg font-bold text-white mb-2">Optimization Failed</h4>
                       <p className="text-xs text-red-400 mb-6">{optimizationError}</p>
-                      <button onClick={() => setAiImprovementResult(null)} className="px-6 py-2 rounded-xl bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-colors">Try Again</button>
+                      <button 
+                        onClick={() => setAiImprovementResult(null)} 
+                        className="px-6 py-2 rounded-xl bg-white/10 text-xs font-bold text-white hover:bg-white/20 transition-colors"
+                      >
+                        Try Again
+                      </button>
                     </div>
                   ) : (
-                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
+                    <div className="flex-1 flex flex-col p-5 rounded-3xl bg-[#111622] border border-white/5 animate-in slide-in-from-right-4 duration-300">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest px-2 py-1 rounded bg-indigo-400/10 border border-indigo-400/20">
-                          Improved {aiImprovementResult.section}
-                        </span>
-                        <button onClick={() => setAiImprovementResult(null)} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors">
-                          ← Back to options
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                            {aiImprovementResult.label || `Improved ${aiImprovementResult.section}`}
+                          </span>
+                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold">
+                            ATS Ready
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => setAiImprovementResult(null)} 
+                          className="text-[11px] font-bold text-gray-400 hover:text-white transition-colors"
+                        >
+                          ← Choose Another
                         </button>
                       </div>
-                      <div className="flex-1 p-5 rounded-2xl bg-[#0A0D14] border border-white/5 text-xs text-gray-300 leading-relaxed overflow-y-auto max-h-[300px] whitespace-pre-wrap custom-scrollbar">
+
+                      <div className="flex-1 p-4 rounded-2xl bg-[#0A0D14] border border-white/5 text-xs text-gray-200 leading-relaxed overflow-y-auto max-h-[260px] whitespace-pre-wrap custom-scrollbar select-text">
                         {aiImprovementResult.content}
                       </div>
-                      <div className="mt-4 flex flex-col gap-3">
-                        <div className="flex gap-3">
+
+                      <div className="mt-4 flex flex-col gap-2.5">
+                        <div className="flex gap-2.5">
                           <button 
                             onClick={() => applyImprovement(aiImprovementResult.section, aiImprovementResult.content)}
-                            className="flex-[2] flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+                            className="flex-[2] flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
                           >
-                            <Sparkles className="w-4 h-4" /> Apply to CV
+                            <Sparkles className="w-4 h-4" /> Apply to CV Preview
                           </button>
                           <button 
                             onClick={() => copyToClipboard(aiImprovementResult.content)}
-                            className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl text-xs font-bold transition-all border border-white/10"
+                            className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-xl text-xs font-bold transition-all border border-white/10"
                           >
-                            <Copy className="w-4 h-4" /> Copy
+                            {copiedText ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                            {copiedText ? "Copied!" : "Copy"}
                           </button>
                           <button 
-                            onClick={() => handleAutoImprove(aiImprovementResult.section)}
-                            className="px-4 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all border border-white/10"
+                            onClick={() => handleAutoImprove(aiImprovementResult.section, "", aiImprovementResult.label)}
+                            className="px-3.5 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all border border-white/10"
                             title="Regenerate"
                           >
                             <RotateCcw className="w-4 h-4" />
@@ -1035,8 +1468,10 @@ export default function AtsAnalyzer() {
                         
                         {showUndoToast && (
                           <div className="flex items-center justify-between px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl animate-in slide-in-from-bottom-2">
-                            <span className="text-[10px] text-indigo-300 font-medium">{successMessage}</span>
-                            <button onClick={undoLastAction} className="text-[10px] font-bold text-white bg-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-700 transition-colors">Undo</button>
+                            <span className="text-xs text-indigo-300 font-medium">{successMessage}</span>
+                            <button onClick={undoLastAction} className="text-[11px] font-bold text-white bg-indigo-600 px-2.5 py-1 rounded-lg hover:bg-indigo-700 transition-colors">
+                              Undo
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1045,40 +1480,232 @@ export default function AtsAnalyzer() {
                 </div>
               </div>
 
-              {/* LIVE PREVIEW SECTION IN MODAL */}
-              {cvData.fullName && (
-                <div className="mt-8 pt-8 border-t border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-emerald-400" />
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Live Preview Sync</h3>
+              {/* BOTTOM: LIVE PREVIEW & TEMPLATE SYNCHRONIZATION */}
+              <div className="pt-6 border-t border-white/5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Eye className="w-4 h-4" />
                     </div>
-                    <div className="text-[10px] text-gray-500 font-medium bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                      Updates instantly as you apply improvements
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Live Preview & Template Sync</h3>
+                        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        {previewMode === "original-template" 
+                          ? "✨ Rendering: Original Uploaded Template (Live AI Changes Applied)"
+                          : previewMode === "alternative-templates"
+                          ? `🎨 Rendering Alternative: ${TEMPLATES_LIST.find(t => t.id === selectedTemplate)?.name || "Modern ATS"}`
+                          : "📄 Viewing Raw Uploaded PDF File (Before AI Reference)"}
+                      </p>
                     </div>
                   </div>
-                  
-                  <div className="rounded-2xl border border-white/10 bg-white overflow-hidden shadow-2xl origin-top scale-[0.6] -mb-[30%] mx-auto w-[794px] transition-all duration-500">
-                    <div className={`p-0 transition-all duration-700 ${lastUpdatedSection ? 'ring-8 ring-emerald-500/30' : ''}`}>
-                      <Template1 cv={{...cvData, theme: cvData.themeManual}} />
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* View mode toggle */}
+                    <div className="flex items-center bg-[#111622] p-1 rounded-xl border border-white/10">
+                      <button
+                        onClick={() => setPreviewMode("original-template")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                          previewMode === "original-template" ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 font-bold" : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        ⭐ Original CV (AI-Updated)
+                      </button>
+                      
+                      <button
+                        onClick={() => setPreviewMode("alternative-templates")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          previewMode === "alternative-templates" ? "bg-indigo-600 text-white shadow" : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        🎨 ProCV Themes
+                      </button>
+
+                      {filePreviewUrl && (
+                        <button
+                          onClick={() => setPreviewMode("raw-pdf")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            previewMode === "raw-pdf" ? "bg-gray-700 text-white shadow" : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          📄 Raw PDF (Before AI)
+                        </button>
+                      )}
                     </div>
+
+                    {/* Page selector for Original CV */}
+                    {previewMode === "original-template" && (
+                      <div className="flex items-center bg-[#111622] p-1 rounded-xl border border-white/10 text-xs">
+                        <button
+                          onClick={() => setPreviewPage("all")}
+                          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                            previewPage === "all" ? "bg-emerald-600 text-white font-bold shadow" : "text-gray-400 hover:text-white"
+                          }`}
+                          title="View both pages with divider"
+                        >
+                          📜 Both Pages
+                        </button>
+                        <button
+                          onClick={() => setPreviewPage(1)}
+                          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                            previewPage === 1 ? "bg-emerald-600 text-white font-bold shadow" : "text-gray-400 hover:text-white"
+                          }`}
+                          title="View Page 1 only"
+                        >
+                          📄 Page 1
+                        </button>
+                        <button
+                          onClick={() => setPreviewPage(2)}
+                          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                            previewPage === 2 ? "bg-emerald-600 text-white font-bold shadow" : "text-gray-400 hover:text-white"
+                          }`}
+                          title="View Page 2 only"
+                        >
+                          📄 Page 2
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Download Updated PDF Button */}
+                    <button
+                      onClick={downloadUpdatedPdf}
+                      disabled={downloadingPdf}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-50"
+                      title="Download the updated original CV as a clean multi-page A4 PDF"
+                    >
+                      {downloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                      {downloadingPdf ? "Generating..." : "Download Updated PDF"}
+                    </button>
+
+                    {/* Open in Builder Button */}
+                    <button
+                      onClick={() => {
+                        setIsOptimizeModalOpen(false);
+                        navigate('/builder', { state: { cvData, templateId: selectedTemplate } });
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Open in Builder
+                    </button>
                   </div>
-                  {lastUpdatedSection && (
-                    <div className="text-center mt-4 text-emerald-400 text-xs font-bold animate-pulse">
-                      Section "{lastUpdatedSection}" updated!
-                    </div>
-                  )}
                 </div>
-              )}
+
+                {/* Notice banner when viewing raw-pdf */}
+                {previewMode === "raw-pdf" && (
+                  <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-300 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                      <span>
+                        You are viewing your <strong>unedited raw PDF file</strong> as uploaded. To see your AI optimizations applied, switch to the <strong>Original CV (AI-Updated)</strong> tab.
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setPreviewMode("original-template")}
+                      className="px-3 py-1 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400 transition-colors whitespace-nowrap text-[11px]"
+                    >
+                      View AI-Updated CV →
+                    </button>
+                  </div>
+                )}
+
+                {/* Template Selector Bar (visible in alternative-templates mode) */}
+                {previewMode === "alternative-templates" && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-4 custom-scrollbar">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 flex-shrink-0 mr-1">
+                      <Layers className="w-3.5 h-3.5" /> Theme:
+                    </span>
+                    {TEMPLATES_LIST.map(tmpl => (
+                      <button
+                        key={tmpl.id}
+                        onClick={() => setSelectedTemplate(tmpl.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
+                          selectedTemplate === tmpl.id
+                            ? "bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30"
+                            : "bg-[#111622] text-gray-400 border-white/5 hover:text-white hover:bg-white/5"
+                        }`}
+                        title={tmpl.desc}
+                      >
+                        {tmpl.name}
+                        {selectedTemplate === tmpl.id && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Preview Canvas */}
+                {previewMode === "raw-pdf" && filePreviewUrl ? (
+                  <div className="w-full h-[620px] rounded-2xl border border-white/10 bg-white overflow-hidden shadow-2xl">
+                    <iframe src={filePreviewUrl} title="Original Raw PDF Document" className="w-full h-full" />
+                  </div>
+                ) : previewMode === "alternative-templates" ? (
+                  <div className="rounded-2xl border border-white/10 bg-white overflow-hidden shadow-2xl origin-top scale-[0.62] -mb-[26%] mx-auto w-[794px] transition-all duration-500">
+                    <div className={`p-0 transition-all duration-700 ${lastUpdatedSection ? 'ring-8 ring-indigo-500/40' : ''}`}>
+                      {(() => {
+                        const activeTmpl = TEMPLATES_LIST.find(t => t.id === selectedTemplate) || TEMPLATES_LIST[0];
+                        const Comp = activeTmpl.comp;
+                        return <Comp cv={{ ...cvData, theme: cvData.themeManual }} />;
+                      })()}
+                    </div>
+                  </div>
+                ) : (
+                  /* DEFAULT: ORIGINAL UPLOADED TEMPLATE WITH REAL-TIME AI UPDATES (PAGINATED & SCROLLABLE) */
+                  <div className="w-full max-h-[700px] overflow-y-auto rounded-2xl border border-white/10 bg-[#090d16] p-4 sm:p-6 shadow-2xl custom-scrollbar flex flex-col items-center">
+                    <div className="w-[794px] origin-top scale-[0.72] sm:scale-[0.80] md:scale-[0.85] transition-all duration-300">
+                      <div className={`transition-all duration-700 ${lastUpdatedSection ? 'ring-8 ring-emerald-500/40' : ''}`}>
+                        <OriginalUploadedTemplate
+                          cv={cvData}
+                          lastUpdatedSection={lastUpdatedSection}
+                          pageToShow={previewPage}
+                          isExport={false}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Offscreen target for crisp multi-page PDF export */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    width: "794px",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    zIndex: -9999,
+                  }}
+                >
+                  <div id="cv-pdf-export-root">
+                    <OriginalUploadedTemplate
+                      cv={cvData}
+                      lastUpdatedSection=""
+                      pageToShow="all"
+                      isExport={true}
+                    />
+                  </div>
+                </div>
+
+                {lastUpdatedSection && (
+                  <div className="text-center mt-4 text-emerald-400 text-xs font-bold animate-pulse">
+                    ✨ Original Template Updated: Section "{lastUpdatedSection}" synchronized!
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-white/5 bg-[#111622] flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[10px] text-gray-500 italic">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Existing data only. No PDF re-upload.
+            <div className="p-4 sm:p-5 border-t border-white/5 bg-[#111622] flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Existing data preserved. Instant ATS preview sync enabled.</span>
               </div>
-              <button onClick={() => setIsOptimizeModalOpen(false)} className="px-6 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => setIsOptimizeModalOpen(false)} 
+                className="px-6 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+              >
                 Close
               </button>
             </div>

@@ -263,6 +263,13 @@ You are an expert ATS (Applicant Tracking System) analyzer and CV parser.
 Task:
 1. Analyze the CV for ATS compatibility.
 2. Parse the CV into a structured JSON format.
+3. Determine which of the available resume templates (t1 to t6) best matches the layout of this CV:
+   - "t3": Classic standard single-column ATS resume with clean horizontal lines and serif/sans headers (best match for traditional, standard black/white or clean corporate resumes like Rashini Jayasekara's).
+   - "t1": Modern two-column layout with a prominent colored left sidebar and contact info.
+   - "t2": Dark-themed modern tech resume.
+   - "t4": Executive layout with timeline-style work experience.
+   - "t5": Minimalist single-column modern layout.
+   - "t6": Academic / comprehensive curriculum vitae layout.
 
 ${jobPart}
 CV Content:
@@ -281,6 +288,7 @@ Respond ONLY with a valid JSON object (no markdown, no code fences) in this exac
   "strengthsFound": <number>,
   "optimizedSections": <number>,
   "totalSections": <number>,
+  "recommendedTemplate": "<'t1' | 't2' | 't3' | 't4' | 't5' | 't6'>",
   "matchedKeywords": ["kw1", "kw2"],
   "missingKeywords": ["kw1", "kw2"],
   "partialKeywords": ["kw1", "kw2"],
@@ -298,15 +306,17 @@ Respond ONLY with a valid JSON object (no markdown, no code fences) in this exac
   },
   "parsedCv": {
     "fullName": "...",
-    "jobTitle": "...",
+    "jobTitle": "<exact professional title or subtitle as written on the CV, e.g. 'Software Engineering | Full-Stack Developer'>",
+    "summaryTitle": "<exact heading used on CV for summary/profile, e.g. 'ABOUT ME' or 'SUMMARY' or 'PROFILE'>",
     "summary": "...",
-    "contact": { "phone": "...", "email": "...", "address": "...", "website": "..." },
+    "contact": { "phone": "...", "email": "...", "linkedin": "...", "github": "...", "address": "...", "website": "..." },
     "education": [{ "years": "...", "university": "...", "degree": "...", "details": "..." }],
+    "projects": [{ "title": "...", "subtitle": "...", "technologies": "...", "github": "...", "bullets": ["bullet1", "bullet2"], "description": "..." }],
+    "technologies": [{ "category": "...", "items": "..." }],
     "skills": ["...", "..."],
-    "experience": [{ "role": "...", "company": "...", "start": "...", "end": "...", "description": "..." }],
-    "projects": [{ "title": "...", "description": "..." }],
+    "experience": [{ "role": "...", "company": "...", "start": "...", "end": "...", "bullets": ["bullet1", "bullet2"], "description": "..." }],
     "certifications": [{ "name": "...", "issuer": "...", "year": "..." }],
-    "achievements": ["...", "..."]
+    "references": [{ "name": "...", "role": "...", "company": "...", "phone": "...", "email": "..." }]
   }
 }
 `;
@@ -320,6 +330,7 @@ Respond ONLY with a valid JSON object (no markdown, no code fences) in this exac
       atsScore: 0, resumeMatch: 0, keywordMatch: 0, formattingScore: 0, readabilityScore: 0,
       overallVerdict: "Unknown", summaryMessage: "Analysis complete.",
       totalIssues: 0, strengthsFound: 0, optimizedSections: 0, totalSections: 5,
+      recommendedTemplate: "t3",
       matchedKeywords: [], missingKeywords: [], partialKeywords: [],
       suggestions: [], strengths: [], weaknesses: [],
       sections: { summary: 0, experience: 0, skills: 0, education: 0, projects: 0 },
@@ -348,31 +359,44 @@ Respond ONLY with a valid JSON object (no markdown, no code fences) in this exac
 
 /**
  * Performs a focused AI improvement on a specific section of the CV.
+ * Can be targeted to a section, missing keywords, or specific custom improvement instructions.
  */
-export async function improveSection(fullText, missingKeywords, sectionName) {
-  const keywordsStr = missingKeywords.length > 0 
-    ? `Naturally incorporate these keywords if relevant: ${missingKeywords.join(", ")}.`
+export async function improveSection(fullText, missingKeywords = [], sectionName = "summary", customInstruction = "") {
+  const keywordsStr = missingKeywords && missingKeywords.length > 0 
+    ? `Target keywords to naturally weave in where applicable: ${missingKeywords.join(", ")}.`
+    : "";
+
+  const customInstructionStr = customInstruction && customInstruction.trim()
+    ? `Specific Goal / Focus: ${customInstruction.trim()}`
     : "";
 
   const prompt = `
-You are an expert CV writer. I will provide the full text of a CV.
-Your task is to rewrite ONLY the "${sectionName}" section to be more professional, achievement-oriented, and ATS-friendly.
+You are an elite ATS resume writer and executive career coach.
+I will provide the text of a CV.
+Your goal is to optimize and rewrite the "${sectionName}" section to maximize ATS score, keyword relevance, and hiring impact.
 
+${customInstructionStr}
 ${keywordsStr}
 
 Full CV Content:
-${fullText.substring(0, 4000)} // Limit to 4k chars to stay safe
+${fullText.substring(0, 4500)}
 
-Requirements:
+ATS Optimization Standards:
 1. Return ONLY the improved content for the "${sectionName}" section.
-2. Use strong action verbs and measurable results.
-3. Keep the tone professional.
-4. Do NOT include any preamble or notes.
+2. Use dynamic, high-impact action verbs (e.g. Architected, Accelerated, Spearheaded, Delivered, Engineered).
+3. Where relevant, add measurable results, metrics, and scale (e.g. "+35% efficiency", "reduced latency by 40%", "supporting 50K+ daily active users").
+4. If improving "skills", return high-value, categorized or comma-separated technical and professional skills matching ATS crawlers.
+5. If improving "summary", provide a compelling 3-4 sentence professional summary tailored for high ATS matching.
+6. If improving "experience" or "projects", format as impact-driven bullet points following the Google XYZ formula (Accomplished [X], as measured by [Y], by doing [Z]).
+7. Do NOT include markdown code fences, headers like "### Improved", greeting, or explanation. Return only the raw improved section text.
 `;
 
   try {
     const response = await safeAiCall(prompt);
-    return response.trim();
+    let cleaned = response.trim();
+    cleaned = cleaned.replace(/^```[a-z]*\n?/i, "").replace(/```$/i, "");
+    cleaned = cleaned.replace(/^#+\s.*?\n/g, "");
+    return cleaned.trim();
   } catch (err) {
     console.error("Improvement Error:", err);
     throw new Error(getFriendlyAiError(err));
