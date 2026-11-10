@@ -1,0 +1,21 @@
+<svg width="1000" height="90" viewBox="0 0 1000 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="footerWaveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4F46E5" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#8B5CF6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="glowLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4F46E5" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#818CF8" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Glowing divider line -->
+  <line x1="100" y1="10" x2="900" y2="10" stroke="url(#glowLine)" stroke-width="1.5"/>
+
+  <!-- Wave layers -->
+  <path d="M0,45 C200,20 400,65 600,35 C800,10 900,50 1000,35 L1000,90 L0,90 Z" fill="url(#footerWaveGrad)"/>
+  <path d="M0,55 C250,70 500,30 750,55 C900,70 950,45 1000,55 L1000,90 L0,90 Z" fill="#6366F1" fill-opacity="0.2"/>
+</svg>

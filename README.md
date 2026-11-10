@@ -3,7 +3,7 @@
 <!-- ======================================================== -->
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=1,12,24&height=220&section=header&text=ProCV%20Lite&fontSize=58&fontColor=ffffff&animation=twinkling&fontAlignY=38&desc=Next-Gen%20AI%20Resume%20Builder%20%E2%80%A2%20Automated%20QA%20%26%20CI%2FCD&descAlignY=60&descSize=19" width="100%" alt="ProCV Lite Header Banner"/>
+  <img src="docs/assets/header.svg" width="100%" alt="ProCV Lite Header Banner"/>
 </div>
 
 <p align="center">
@@ -192,6 +192,6 @@ npm run test:e2e:report
 <!-- ======================================================== -->
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=1,12,24&height=120&section=footer" width="100%" alt="Footer Wave Divider"/>
+  <img src="docs/assets/footer.svg" width="100%" alt="Footer Wave Divider"/>
   <p><b>Crafted with engineering rigor and ❤️ by <a href="https://github.com/prageethgihan">Prageeth Gihan</a></b></p>
 </div>
