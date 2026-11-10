@@ -89,7 +89,7 @@ The automated test suite runs **17 comprehensive test cases** spanning multiple 
     <td width="50%" align="center">
       <b>GitHub Actions CI/CD Pipeline</b><br/>
       <sub>Automated Cloud Runner executing E2E tests & caching artifacts in 1m 28s</sub><br/><br/>
-      <img src="docs/qa/github-actions-cicd.jpg" alt="GitHub Actions Pipeline" width="100%"/>
+      <img src="docs/qa/github-actions-pipeline.jpg" alt="GitHub Actions Pipeline" width="100%"/>
     </td>
   </tr>
 </table>
