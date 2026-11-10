@@ -82,9 +82,9 @@ The automated test suite runs **17 comprehensive test cases** spanning multiple 
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <b>Playwright Interactive UI Dashboard</b><br/>
-      <sub>17/17 (100%) Tests Passing with Time-Travel DOM Snapshots</sub><br/><br/>
-      <img src="docs/qa/playwright-dashboard.png" alt="Playwright Test Dashboard" width="100%"/>
+      <b>Playwright Comprehensive HTML Test Report</b><br/>
+      <sub>17/17 Passed (0 Failed, 0 Flaky) with Full Traces & Execution Timing</sub><br/><br/>
+      <img src="docs/qa/playwright-html-report.jpg" alt="Playwright HTML Test Report" width="100%"/>
     </td>
     <td width="50%" align="center">
       <b>GitHub Actions CI/CD Pipeline</b><br/>
@@ -93,6 +93,14 @@ The automated test suite runs **17 comprehensive test cases** spanning multiple 
     </td>
   </tr>
 </table>
+
+<details>
+  <summary><b>🔍 Click to view Playwright Interactive UI Mode & Time-Travel Debugger</b></summary>
+  <br/>
+  <p align="center">
+    <img src="docs/qa/playwright-dashboard.png" alt="Playwright Interactive UI Dashboard" width="85%"/>
+  </p>
+</details>
 
 ### 🔄 CI/CD Workflow Architecture
 - **Continuous Integration (CI):** Every push or pull request to `main` automatically spins up a clean Ubuntu cloud instance via GitHub Actions.
